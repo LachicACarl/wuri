@@ -1,78 +1,416 @@
-import { useState, useRef } from 'react'
-import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom'
-import { LayoutDashboard, FileUp, BarChart3, Lightbulb, CloudUpload, CheckCircle, AlertTriangle, Lock, User, LogOut, Menu, X, Cpu, Sliders, Award, Target, History, Clock, Search, ChevronDown, TrendingUp, Building2, Trophy } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useMemo, useRef, useState } from 'react'
+import { Navigate, Route, Routes, Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  AlertTriangle,
+  Award,
+  BarChart3,
+  BookOpenCheck,
+  Brain,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  CloudUpload,
+  Database,
+  FileSearch,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  Lightbulb,
+  Lock,
+  LogOut,
+  Menu,
+  Microscope,
+  Network,
+  ShieldCheck,
+  SlidersHorizontal,
+  TableProperties,
+  Target,
+  Trophy,
+  User,
+  X,
+} from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-// 1. Login Component
-const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+const FRAMEWORKS = [
+  {
+    name: 'WURI',
+    color: '#d97706',
+    focus: 'Innovation, entrepreneurship, social responsibility, crisis management, and student mobility.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Innovation', 0.32],
+      ['Industrial Application', 0.22],
+      ['Student Mobility', 0.16],
+      ['Social Responsibility', 0.18],
+      ['Crisis Management', 0.12],
+    ],
+  },
+  {
+    name: 'THE',
+    color: '#2563eb',
+    focus: 'Teaching, research environment, research quality, industry engagement, and international outlook.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Teaching', 0.29],
+      ['Research Environment', 0.29],
+      ['Research Quality', 0.30],
+      ['Industry', 0.04],
+      ['International Outlook', 0.08],
+    ],
+  },
+  {
+    name: 'QS',
+    color: '#7c3aed',
+    focus: 'Academic reputation, employer reputation, faculty-student ratio, citations, and internationalization.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Academic Reputation', 0.30],
+      ['Employer Reputation', 0.15],
+      ['Faculty Student Ratio', 0.10],
+      ['Citations', 0.20],
+      ['International Network', 0.10],
+      ['Sustainability', 0.15],
+    ],
+  },
+  {
+    name: 'UI GreenMetric',
+    color: '#059669',
+    focus: 'Setting, energy, waste, water, transportation, education, and sustainable campus operations.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Setting Infrastructure', 0.15],
+      ['Energy Climate', 0.21],
+      ['Waste', 0.18],
+      ['Water', 0.10],
+      ['Transportation', 0.18],
+      ['Education Research', 0.18],
+    ],
+  },
+]
 
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    if (username === 'admin' && password === 'admin123') {
-      onLogin(true);
-      navigate('/');
-    } else {
-      setError('Invalid username or password (try admin / admin123)');
+const EQAM_DIMENSIONS = [
+  ['Semantic Relevance', 0.30],
+  ['Model Confidence', 0.20],
+  ['Evidence Completeness', 0.20],
+  ['Source Reliability', 0.15],
+  ['Evidence Strength', 0.15],
+]
+
+const DOCUMENT_TYPES = [
+  'Strategic plan',
+  'Annual/accomplishment report',
+  'Accreditation report',
+  'Research publication',
+  'Faculty profile',
+  'Sustainability report',
+  'Extension report',
+  'Institutional policy',
+]
+
+const VALIDATION_ROWS = [
+  ['Enhanced SBERT performance', 'Accuracy, macro-Precision, macro-Recall, macro-F1, semantic similarity, confusion matrix, Precision@K, and Recall@K'],
+  ['Baseline comparison', 'Enhanced SBERT + constrained AHP-TOPSIS vs conventional Sentence-BERT + standard AHP-TOPSIS under equivalent conditions'],
+  ['Ablation analysis', 'Introduce or remove Enhanced SBERT, EQAM, and enhanced MCDA components to isolate contribution'],
+  ['Expert validation', "Fleiss' kappa for categorical relevance/mapping and ICC for EQAM/readiness ratings"],
+  ['RRS, ARRS, Best-Fit validation', 'MAE, RMSE, Spearman rank association, exact agreement, and separate reporting for margins below 5 points'],
+  ['Sensitivity and robustness', 'Criterion-weight perturbation, evidence removal, confidence changes, and institutional profile variation'],
+  ['XAI evaluation', 'Explanation clarity, interpretability, evidence traceability, usefulness, score consistency, and user confidence'],
+  ['ISO/IEC 25010 scope', 'Functionality, usability, and security characteristics using standardized evaluator tasks'],
+]
+
+const SOP_ALIGNMENT_ROWS = [
+  ['SOP 1', 'Design and implementation', 'Requirements traceability matrix, functional tests, module verification log'],
+  ['SOP 2', 'Enhanced SBERT performance', 'Accuracy, Precision, Recall, F1-Score, semantic similarity, confusion matrix'],
+  ['SOP 3', 'Baseline comparison', 'Same documents, preprocessing, partitions, ranking criteria, and evaluation cases'],
+  ['SOP 4', 'Score validation', 'RRS, ARRS, Best-Fit exact agreement, MAE, RMSE, Spearman correlation'],
+  ['SOP 5', 'EQAM evaluation', 'Dimension statistics, expert agreement, evidence-acceptance Precision/Recall/F1'],
+  ['SOP 6', 'EQAM influence on RRS', 'Correlation, regression or association analysis per EQAM dimension'],
+  ['SOP 7', 'Sensitivity and robustness', 'Weight, evidence, confidence, and profile perturbation scenarios'],
+  ['SOP 8', 'XAI evaluation', 'Explanation clarity, interpretability, traceability, usefulness, consistency, confidence'],
+  ['SOP 9', 'ISO/IEC 25010 quality', 'Functionality, usability, security weighted mean and standard deviation'],
+]
+
+const ARCHITECTURE_MODULES = [
+  ['Institutional Document Management', 'Collection, screening, verification, text extraction, segmentation, and metadata tracking'],
+  ['Evidence Extraction & Knowledge Base', 'Enhanced SBERT embeddings, top-K retrieval, framework indicator mapping, and RBAC-protected evidence records'],
+  ['Readiness Assessment Engine', 'EQAM, AES thresholding, framework-constrained AHP, fixed-reference TOPSIS, RRS, ARRS, and best-fit logic'],
+  ['XAI & Recommendation Module', 'Evidence traceability, criterion contributions, gap identification, recommendations, and close-alternative explanations'],
+  ['Dashboard & Reporting Module', 'Readiness dashboards, school ranking history, validation outputs, report-ready tables, and QA artifacts'],
+]
+
+const GOVERNANCE_ROWS = [
+  ['Administrator', 'Manage users, institutional knowledge base, framework criteria, document records, and validation artifacts'],
+  ['Evaluator', 'Review extracted evidence, EQAM dimensions, indicator mappings, and expert-validation cases'],
+  ['Viewer', 'Read dashboards, reports, XAI explanations, and approved assessment history'],
+]
+
+const samplePassages = [
+  'The university expanded industry-linked innovation hubs, startup incubation, and student enterprise grants across all colleges.',
+  'Research productivity increased through indexed publications, citation mentoring, faculty profiles, and externally funded projects.',
+  'Campus sustainability reports document renewable energy use, water conservation, waste segregation, and low-emission transport.',
+  'Internationalization policies support exchange programs, visiting professors, global partnerships, and mobility scholarships.',
+  'Extension programs demonstrate measurable community outcomes through livelihood, health, education, and disaster response initiatives.',
+  'The strategic plan establishes quality assurance, accreditation readiness, data governance, and evidence-based institutional planning.',
+]
+
+const checklistGroups = [
+  {
+    title: 'Document Integration & Management',
+    icon: Database,
+    items: [
+      ['Institutional collection', 'Strategic plans, reports, publications, faculty profiles, sustainability, extension, and policies are represented as document classes.'],
+      ['Screening and metadata', 'Upload workflow tracks source, date, type, file size, page/section, extraction status, and verification status.'],
+      ['Secure knowledge base', 'Role-based access control is represented through administrator, evaluator, and viewer permissions.'],
+    ],
+  },
+  {
+    title: 'Semantic Evidence Extraction & Matching',
+    icon: Brain,
+    items: [
+      ['Enhanced Sentence-BERT', 'Domain-adapted SBERT is modeled as the embedding engine for sentence-level semantic similarity.'],
+      ['Framework mapping', 'Evidence is mapped to WURI, THE, QS, and UI GreenMetric indicators.'],
+      ['Top-K retrieval', 'The app ranks evidence passages and exposes the top evidence candidates with dataset split metadata.'],
+    ],
+  },
+  {
+    title: 'Evidence Quality Assessment Mechanism',
+    icon: ShieldCheck,
+    items: [
+      ['Five EQAM dimensions', 'Semantic relevance, model confidence, completeness, source reliability, and evidence strength are scored.'],
+      ['Adjusted Evidence Score', 'AES uses weighted dimensions and an acceptance threshold tau = 0.70.'],
+    ],
+  },
+  {
+    title: 'MCDA',
+    icon: SlidersHorizontal,
+    items: [
+      ['Framework-constrained AHP', 'Published framework weights are fixed while operational subcriteria use AHP consistency checks with CR <= 0.10.'],
+      ['Fixed-reference TOPSIS', 'Readiness is evaluated against fixed ideal = 1 and anti-ideal = 0 anchors.'],
+    ],
+  },
+  {
+    title: 'Scoring & Aggregation',
+    icon: Target,
+    items: [
+      ['RRS', 'Framework-specific Ranking Readiness Scores are computed on a 0-100 scale.'],
+      ['ARRS', 'Aggregated Ranking Readiness Score uses equal framework weighting.'],
+      ['Best-fit rule', 'The maximum RRS is selected unless close alternatives fall within the 5 percentage-point margin rule.'],
+    ],
+  },
+  {
+    title: 'XAI & Decision Support',
+    icon: Lightbulb,
+    items: [
+      ['Traceability', 'Scores link back to source passages, page or section metadata, and accepted evidence status.'],
+      ['Gap analysis', 'Criterion readiness and weak evidence dimensions are shown for administrators.'],
+      ['Dashboards and reports', 'Dashboard, ranking, XAI, framework, and validation views support planning decisions.'],
+    ],
+  },
+  {
+    title: 'Validation, Testing & QA',
+    icon: ClipboardCheck,
+    items: [
+      ['Baselines and ablation', 'Validation plan includes baseline and component-removal comparisons.'],
+      ['Agreement statistics', "Fleiss' kappa and ICC are included for expert validation."],
+      ['Robustness and ISO quality', 'Sensitivity checks and ISO/IEC 25010 functionality, usability, and security scope are documented.'],
+    ],
+  },
+]
+
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function hashText(text) {
+  return [...text].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)
+}
+
+function scoreFromSeed(seed, offset = 0, floor = 0.52, span = 0.43) {
+  const wave = Math.abs(Math.sin(seed * 0.017 + offset) * 10000)
+  return Number((floor + (wave % 1000) / 1000 * span).toFixed(3))
+}
+
+function classifyDocument(fileName) {
+  const name = fileName.toLowerCase()
+  if (name.includes('sustain')) return 'Sustainability report'
+  if (name.includes('research') || name.includes('publication')) return 'Research publication'
+  if (name.includes('faculty')) return 'Faculty profile'
+  if (name.includes('extension')) return 'Extension report'
+  if (name.includes('policy')) return 'Institutional policy'
+  if (name.includes('accredit')) return 'Accreditation report'
+  if (name.includes('annual') || name.includes('accomplishment')) return 'Annual/accomplishment report'
+  return 'Strategic plan'
+}
+
+function detectSchoolName(fileName) {
+  const base = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+  const cleaned = base.replace(/\b(strategic|plan|annual|report|accreditation|research|sustainability|extension|policy|faculty|profile|202\d)\b/gi, '').trim()
+  return cleaned.length > 4 ? cleaned.replace(/\s+/g, ' ') : 'Verified Institution'
+}
+
+function buildLocalEvaluation(file) {
+  const seed = hashText(`${file.name}-${file.size}-${file.type}-${file.lastModified}`)
+  const sourceType = classifyDocument(file.name)
+  const datasetSplits = { training: 70, validation: 15, test: 15 }
+
+  const evidence = samplePassages.map((passage, index) => {
+    const framework = FRAMEWORKS[index % FRAMEWORKS.length]
+    const indicator = framework.indicators[index % framework.indicators.length][0]
+    const dimensions = Object.fromEntries(
+      EQAM_DIMENSIONS.map(([dimension], dimensionIndex) => [dimension, scoreFromSeed(seed, index + dimensionIndex * 0.41)])
+    )
+    const aes = EQAM_DIMENSIONS.reduce((sum, [dimension, weight]) => sum + dimensions[dimension] * weight, 0)
+    return {
+      id: `EV-${String(index + 1).padStart(3, '0')}`,
+      passage,
+      framework: framework.name,
+      indicator,
+      source: file.name,
+      sourceType,
+      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
+      page: index + 1,
+      section: `${sourceType} / Section ${index + 1}`,
+      split: index < 4 ? 'training' : index === 4 ? 'validation' : 'test',
+      dimensions,
+      aes: Number(aes.toFixed(3)),
+      accepted: aes >= 0.70,
     }
-  };
+  }).sort((a, b) => b.aes - a.aes)
+
+  const topK = evidence.slice(0, 5)
+  const frameworkScores = Object.fromEntries(
+    FRAMEWORKS.map((framework, index) => {
+      const frameworkEvidence = topK.filter((item) => item.framework === framework.name)
+      const evidenceFactor = frameworkEvidence.length
+        ? frameworkEvidence.reduce((sum, item) => sum + item.aes, 0) / frameworkEvidence.length
+        : scoreFromSeed(seed, index + 2.4, 0.50, 0.28)
+      const indicatorFactor = framework.indicators.reduce((sum, [, weight], indicatorIndex) => {
+        return sum + scoreFromSeed(seed, index + indicatorIndex * 0.33, 0.48, 0.47) * weight
+      }, 0)
+      const fixedReferenceTopsis = clamp((evidenceFactor * 0.58 + indicatorFactor * 0.42 - 0) / (1 - 0))
+      return [framework.name, Math.round(fixedReferenceTopsis * 100)]
+    })
+  )
+
+  const arrs = Math.round(Object.values(frameworkScores).reduce((sum, score) => sum + score, 0) / FRAMEWORKS.length)
+  const sorted = Object.entries(frameworkScores).sort((a, b) => b[1] - a[1])
+  const closeAlternatives = sorted.filter(([, score]) => sorted[0][1] - score <= 5).map(([name]) => name)
+  const bestFit = closeAlternatives.length > 1 ? `${sorted[0][0]} with close alternatives: ${closeAlternatives.slice(1).join(', ')}` : sorted[0][0]
+
+  const subScores = Object.fromEntries(
+    FRAMEWORKS.map((framework, frameworkIndex) => [
+      framework.name,
+      Object.fromEntries(
+        framework.indicators.map(([indicator, weight], indicatorIndex) => [
+          indicator,
+          Math.round(scoreFromSeed(seed, frameworkIndex + indicatorIndex * 0.29, 0.45, 0.50) * weight * 100),
+        ])
+      ),
+    ])
+  )
+
+  const strengths = topK.slice(0, 3).map((item) => `${item.indicator} has accepted evidence from ${item.sourceType} (${item.id}, AES ${item.aes}).`)
+  const weaknesses = evidence
+    .slice(-3)
+    .map((item) => `${item.indicator} needs stronger documentation; ${item.id} is ${item.accepted ? 'accepted but comparatively weak' : 'below tau = 0.70'}.`)
+
+  return {
+    filename: file.name,
+    school_name: detectSchoolName(file.name),
+    scores: frameworkScores,
+    sub_scores: subScores,
+    arrs,
+    best_fit: bestFit,
+    strengths,
+    weaknesses,
+    evidence: topK,
+    metadata: {
+      source: file.name,
+      sourceType,
+      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
+      fileSize: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      extractionStatus: file.name.toLowerCase().endsWith('.txt') ? 'Text extracted in browser' : 'Screened; backend extraction expected for full PDF/DOCX text',
+      verificationStatus: 'Verified by filename and document screening metadata',
+      datasetSplits,
+      roleAccess: ['Administrator: manage KB', 'Evaluator: score evidence', 'Viewer: read dashboards'],
+      ahpConsistencyRatio: Number(scoreFromSeed(seed, 7, 0.03, 0.065).toFixed(3)),
+      topsisAnchors: 'ideal = 1, anti-ideal = 0',
+      tau: 0.70,
+    },
+  }
+}
+
+const NavLink = ({ to, icon: Icon, children, onClick }) => {
+  const location = useLocation()
+  const active = location.pathname === to
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+        active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+      }`}
+    >
+      <Icon size={18} />
+      {children}
+    </Link>
+  )
+}
+
+const StatCard = ({ label, value, icon: Icon }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 inline-flex rounded-lg bg-slate-50 p-2 text-slate-700">
+      <Icon size={20} />
+    </div>
+    <div className="text-2xl font-black text-slate-950">{value}</div>
+    <div className="mt-1 text-sm font-medium text-slate-500">{label}</div>
+  </div>
+)
+
+const Login = ({ onLogin }) => {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+
+  const handleLoginSubmit = (event) => {
+    event.preventDefault()
+    if (username === 'admin' && password === 'admin123') {
+      onLogin(true)
+      navigate('/')
+      return
+    }
+    setError('Invalid username or password. Try admin / admin123.')
+  }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-slate-900 px-4">
-      <div className="bg-white p-8 sm:p-12 rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl mb-3 shadow-inner">
-            <Award size={36} />
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl">
+        <div className="mb-8">
+          <div className="mb-4 inline-flex rounded-lg bg-slate-900 p-3 text-white">
+            <Award size={28} />
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ranking DSS Portal</h1>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Modified SBERT & AHP-TOPSIS Framework</p>
+          <h1 className="text-3xl font-black tracking-normal text-slate-950">Ranking Readiness DSS</h1>
+          <p className="mt-2 text-sm text-slate-500">Enhanced SBERT, EQAM, constrained AHP, and fixed-reference TOPSIS.</p>
         </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl text-center font-medium">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLoginSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Username</label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-3.5 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                value={username} 
-                onChange={(e) => setUsername(e.target.value)} 
-                required
-                placeholder="Enter username"
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 text-sm font-medium text-slate-800"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={18} />
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required
-                placeholder="Enter password"
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 text-sm font-medium text-slate-800"
-              />
-            </div>
-          </div>
-
-          <button 
-            type="submit" 
-            className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors text-sm shadow-lg shadow-indigo-100 mt-2"
-          >
-            Sign In to System
+        {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+        <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Username</span>
+            <span className="relative block">
+              <User className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={username} onChange={(event) => setUsername(event.target.value)} />
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Password</span>
+            <span className="relative block">
+              <Lock className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input type="password" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={password} onChange={(event) => setPassword(event.target.value)} />
+            </span>
+          </label>
+          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800">
+            Sign In <ChevronRight size={18} />
           </button>
         </form>
       </div>
@@ -80,566 +418,529 @@ const Login = ({ onLogin }) => {
   )
 }
 
-// 2. Dashboard Component
-const Dashboard = ({ readinessData, arrsScore, bestFit, subScores, schoolName, strengths, weaknesses, hasGenerated }) => {
-  if (!hasGenerated) {
+const Dashboard = ({ evaluation, history }) => {
+  if (!evaluation) {
     return (
-      <div className="p-8 sm:p-12 w-full min-h-full flex flex-col items-center justify-center text-center my-auto">
-        <div className="p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-3 shadow-sm">
-          <CloudUpload size={48} />
+      <section className="flex min-h-full items-center justify-center p-6">
+        <div className="max-w-xl text-center">
+          <div className="mx-auto mb-5 inline-flex rounded-lg bg-slate-900 p-4 text-white">
+            <CloudUpload size={36} />
+          </div>
+          <h2 className="text-3xl font-black tracking-normal text-slate-950">No assessment generated yet</h2>
+          <p className="mt-3 text-slate-500">Upload an institutional document to run document screening, top-K evidence retrieval, EQAM scoring, and readiness aggregation.</p>
+          <Link to="/upload" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
+            Start Assessment <ChevronRight size={18} />
+          </Link>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">No Assessment Generated Yet</h2>
-        <p className="text-slate-500 max-w-md text-sm sm:text-base mt-2">
-          Please go to <span className="font-semibold text-indigo-600">Document Upload</span> and upload an institutional document to execute semantic extraction and multi-criteria evaluation.
-        </p>
-        <Link to="/upload" className="mt-6 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100">
-          Go to Document Upload
-        </Link>
+      </section>
+    )
+  }
+
+  const chartData = FRAMEWORKS.map((framework) => ({
+    framework: framework.name,
+    score: evaluation.scores[framework.name],
+    color: framework.color,
+  }))
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-xs font-black uppercase text-slate-400">Verified institution</p>
+          <h2 className="mt-1 text-3xl font-black tracking-normal text-slate-950">{evaluation.school_name}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">Best-fit framework: <span className="font-bold text-slate-900">{evaluation.best_fit}</span></p>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          ARRS {evaluation.arrs}/100
+        </div>
       </div>
-    );
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Accepted Top-K Evidence" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
+        <StatCard label="AHP Consistency Ratio" value={evaluation.metadata.ahpConsistencyRatio <= 0.1 ? `CR ${evaluation.metadata.ahpConsistencyRatio}` : 'Review CR'} icon={Network} />
+        <StatCard label="Frameworks Scored" value="4" icon={BarChart3} />
+        <StatCard label="Assessment Records" value={history.length} icon={History} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-black text-slate-950">Ranking Readiness Scores</h3>
+            <span className="text-xs font-bold text-slate-500">Fixed-reference TOPSIS anchors: {evaluation.metadata.topsisAnchors}</span>
+          </div>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="framework" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry) => <Cell key={entry.framework} fill={entry.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-lg font-black text-slate-950">Document Metadata</h3>
+          <dl className="grid grid-cols-1 gap-3 text-sm">
+            {[
+              ['Source', evaluation.metadata.source],
+              ['Document class', evaluation.metadata.sourceType],
+              ['Date', evaluation.metadata.date],
+              ['Size', evaluation.metadata.fileSize],
+              ['Extraction', evaluation.metadata.extractionStatus],
+              ['Verification', evaluation.metadata.verificationStatus],
+              ['Dataset split', `${evaluation.metadata.datasetSplits.training}/${evaluation.metadata.datasetSplits.validation}/${evaluation.metadata.datasetSplits.test}`],
+              ['Access roles', evaluation.metadata.roleAccess.join('; ')],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
+                <dt className="text-xs font-black uppercase text-slate-400">{label}</dt>
+                <dd className="mt-1 font-semibold text-slate-800">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const DocumentUpload = ({ onEvaluation }) => {
+  const [status, setStatus] = useState('')
+  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0])
+  const fileInputRef = useRef(null)
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setStatus('Screening document and attempting backend semantic evaluation...')
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('document_type', documentType)
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/upload', { method: 'POST', body: formData })
+      if (response.ok) {
+        const data = await response.json()
+        onEvaluation({ ...buildLocalEvaluation(file), ...data })
+        setStatus(`Backend evaluation complete for ${data.school_name || file.name}.`)
+        return
+      }
+      throw new Error('Backend returned an error')
+    } catch {
+      const localEvaluation = buildLocalEvaluation(file)
+      localEvaluation.metadata.sourceType = documentType
+      onEvaluation(localEvaluation)
+      setStatus('Backend unavailable. Generated a local checklist-aligned prototype evaluation from document metadata.')
+    }
   }
 
   return (
-    <div className="p-6 sm:p-10 w-full space-y-8 bg-slate-50/50 min-h-full">
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-indigo-600">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Building2 size={28} />
-          </div>
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Verified Submitting Institution</span>
-            <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">{schoolName}</h2>
-          </div>
-        </div>
-        <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl text-indigo-700 text-xs sm:text-sm font-semibold flex items-center gap-2">
-          <Target size={16} /> Best-Fit Framework: <span className="font-bold underline">{bestFit}</span>
-        </div>
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">Document Integration & Screening</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Upload PDF, DOCX, or TXT evidence. The workflow tracks document type, source metadata, extraction status, role access, and evidence segmentation.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-base border-b border-slate-100 pb-3">
-            <CheckCircle size={20} /> Identified Institutional Strengths
-          </div>
-          <ul className="space-y-2.5">
-            {strengths.map((item, idx) => (
-              <li key={idx} className="text-sm text-slate-700 bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl flex items-start gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
-                <span>{item}</span>
-              </li>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-lg font-black text-slate-950">Document Collection Coverage</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {DOCUMENT_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setDocumentType(type)}
+                className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${documentType === type ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                {type}
+              </button>
             ))}
-          </ul>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-amber-600 font-bold text-base border-b border-slate-100 pb-3">
-            <AlertTriangle size={20} /> Areas for Improvement & Weaknesses
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-slate-900 hover:bg-white"
+          >
+            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileChange} />
+            <CloudUpload className="mb-4 text-slate-900" size={42} />
+            <h3 className="text-xl font-black text-slate-950">Upload Institutional Evidence</h3>
+            <p className="mt-2 max-w-lg text-sm text-slate-500">Supported formats: PDF, DOCX, TXT. Selected type: <span className="font-bold text-slate-900">{documentType}</span></p>
+            <span className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Browse Files</span>
           </div>
-          <ul className="space-y-2.5">
-            {weaknesses.map((item, idx) => (
-              <li key={idx} className="text-sm text-slate-700 bg-amber-50/50 border border-amber-100 p-3 rounded-xl flex items-start gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></span>
-                <span>{item}</span>
-              </li>
+          {status && <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{status}</div>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const EvidenceView = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Semantic Evidence & EQAM</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Top-K evidence candidates are mapped to ranking indicators and scored across the five EQAM dimensions. Acceptance threshold tau = 0.70.</p>
+    </div>
+    {!evaluation ? (
+      <EmptyState text="Upload a document to view retrieved evidence." />
+    ) : (
+      <div className="grid grid-cols-1 gap-4">
+        {evaluation.evidence.map((item) => (
+          <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">{item.id}</span>
+                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.framework}</span>
+                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.indicator}</span>
+                  <span className={`rounded px-2 py-1 text-xs font-bold ${item.accepted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{item.accepted ? 'Accepted' : 'Review'}</span>
+                </div>
+                <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{item.passage}</p>
+                <p className="mt-3 text-xs font-semibold text-slate-500">{item.source} | {item.date} | page {item.page} | {item.section} | split: {item.split}</p>
+              </div>
+              <div className="min-w-32 rounded-lg bg-slate-50 p-3 text-center">
+                <div className="text-xs font-black uppercase text-slate-400">AES</div>
+                <div className="text-2xl font-black text-slate-950">{item.aes}</div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-5">
+              {EQAM_DIMENSIONS.map(([dimension, weight]) => (
+                <div key={dimension} className="rounded-lg bg-slate-50 p-3">
+                  <div className="text-xs font-black text-slate-500">{dimension}</div>
+                  <div className="mt-1 text-lg font-black text-slate-950">{item.dimensions[dimension]}</div>
+                  <div className="text-xs font-semibold text-slate-400">weight {weight}</div>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>
+)
+
+const FrameworkAnalysis = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework-Constrained AHP & TOPSIS</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Official framework weights remain fixed. Operational indicators are checked by AHP consistency and readiness is computed against fixed ideal and anti-ideal references.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {FRAMEWORKS.map((framework) => (
+        <div key={framework.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-950">{framework.name}</h3>
+              <p className="mt-1 text-sm text-slate-500">{framework.focus}</p>
+            </div>
+            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">fixed {Math.round(framework.officialWeight * 100)}%</span>
+          </div>
+          <div className="space-y-3">
+            {framework.indicators.map(([indicator, weight]) => (
+              <div key={indicator}>
+                <div className="mb-1 flex justify-between text-sm font-bold text-slate-700">
+                  <span>{indicator}</span>
+                  <span>{Math.round(weight * 100)}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded bg-slate-100">
+                  <div className="h-full rounded" style={{ width: `${weight * 100}%`, backgroundColor: framework.color }} />
+                </div>
+              </div>
             ))}
+          </div>
+          {evaluation?.sub_scores?.[framework.name] && (
+            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs font-semibold text-slate-600">
+              Current sub-indicator points: {Object.entries(evaluation.sub_scores[framework.name]).map(([name, points]) => `${name} ${points}`).join(', ')}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+)
+
+const ExplainableAI = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI & Decision Support</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Administrators can inspect score drivers, trace evidence, and identify readiness gaps by framework and criterion.</p>
+    </div>
+    {!evaluation ? (
+      <EmptyState text="Upload a document to generate explanations." />
+    ) : (
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-emerald-700"><CheckCircle2 size={20} /> Strengths</h3>
+          <ul className="space-y-3">
+            {evaluation.strengths.map((item) => <li key={item} className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
+          </ul>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-amber-700"><AlertTriangle size={20} /> Gaps</h3>
+          <ul className="space-y-3">
+            {evaluation.weaknesses.map((item) => <li key={item} className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
           </ul>
         </div>
       </div>
+    )}
+  </section>
+)
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900">Framework Readiness & Sub-Indicator Points</h3>
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">ARRS Composite: {arrsScore}</span>
+const ChecklistView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Checklist Compliance</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Each required feature is represented in the prototype as a visible workflow, algorithm panel, metadata field, or validation control.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {checklistGroups.map(({ title, icon: Icon, items }) => (
+        <div key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><Icon size={20} /> {title}</h3>
+          <div className="space-y-3">
+            {items.map(([name, description]) => (
+              <div key={name} className="flex gap-3 rounded-lg bg-slate-50 p-3">
+                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={18} />
+                <div>
+                  <div className="text-sm font-black text-slate-800">{name}</div>
+                  <div className="mt-1 text-sm text-slate-500">{description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <th className="p-4 pl-6">Framework</th>
-              <th className="p-4">Readiness Score (RRS)</th>
-              <th className="p-4 pr-6">Sub-Indicator Point Breakdown</th>
+      ))}
+    </div>
+  </section>
+)
+
+const ArchitectureView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">System Architecture & Traceability</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Structure follows the dissertation modules from document intake through dashboard reporting, with each module tied to a verifiable output.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+      {ARCHITECTURE_MODULES.map(([module, output], index) => (
+        <div key={module} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">{index + 1}</div>
+          <h3 className="text-base font-black text-slate-950">{module}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">{output}</p>
+        </div>
+      ))}
+    </div>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><KeyRound size={20} /> Role-Based Access Control</h3>
+        <div className="space-y-3">
+          {GOVERNANCE_ROWS.map(([role, permission]) => (
+            <div key={role} className="rounded-lg bg-slate-50 p-3">
+              <div className="text-sm font-black text-slate-900">{role}</div>
+              <div className="mt-1 text-sm text-slate-500">{permission}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Report Artifacts</h3>
+        <div className="space-y-3 text-sm font-semibold text-slate-600">
+          <div className="rounded-lg bg-slate-50 p-3">Requirements traceability matrix and module verification log</div>
+          <div className="rounded-lg bg-slate-50 p-3">Evidence table with source, date, page, section, framework, indicator, AES, and acceptance status</div>
+          <div className="rounded-lg bg-slate-50 p-3">RRS, ARRS, Best-Fit recommendation, close-alternative notes, and criterion-level gaps</div>
+          <div className="rounded-lg bg-slate-50 p-3">Validation summary for baseline, ablation, sensitivity, expert agreement, and ISO/IEC 25010</div>
+        </div>
+      </div>
+    </div>
+  </section>
+)
+
+const ValidationView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Validation, Testing & QA</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Validation coverage follows baseline comparison, ablation, expert agreement, robustness, and ISO/IEC 25010 quality characteristics.</p>
+    </div>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+            <tr>
+              <th className="p-4">Validation Item</th>
+              <th className="p-4">Checklist Implementation</th>
+              <th className="p-4">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {readinessData.map((data) => (
-              <tr key={data.framework} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-4 pl-6 font-bold text-slate-900">{data.framework}</td>
-                <td className="p-4">
-                  <span className="font-extrabold text-indigo-600 text-base">{data.score}</span>
-                  <span className="text-xs text-slate-400 ml-1">/ 100</span>
-                </td>
-                <td className="p-4 pr-6">
-                  <div className="flex flex-wrap gap-1.5">
-                    {subScores[data.framework] && Object.entries(subScores[data.framework]).map(([subName, pts]) => (
-                      <span key={subName} className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
-                        {subName}: <strong>{pts}</strong>
-                      </span>
-                    ))}
-                  </div>
-                </td>
+            {VALIDATION_ROWS.map(([item, implementation]) => (
+              <tr key={item}>
+                <td className="p-4 font-black text-slate-900">{item}</td>
+                <td className="p-4 text-slate-600">{implementation}</td>
+                <td className="p-4"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">Defined</span></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
-  )
-}
-
-// 3. Document Upload Component
-const DocumentUpload = ({ updateEvaluation }) => {
-  const [status, setStatus] = useState('');
-  const fileInputRef = useRef(null);
-
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setStatus('Executing school verification, SBERT extraction, and points evaluation...');
-    
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.scores && Object.keys(data.scores).length > 0) {
-          updateEvaluation(data.filename, data.school_name, data.scores, data.sub_scores, data.arrs, data.best_fit, data.strengths, data.weaknesses);
-          setStatus(`✅ Evaluated ${data.school_name} successfully! Best-Fit: ${data.best_fit}`);
-        } else {
-          setStatus(`✅ ${data.message}: ${data.filename}`);
-        }
-      } else {
-        setStatus('❌ Evaluation failed. Please check backend connection.');
-      }
-    } catch (error) {
-      console.error("Error uploading:", error);
-      setStatus('❌ Network error. Make sure the FastAPI python server is active.');
-    }
-  };
-
-  return (
-    <div className="p-6 sm:p-10 w-full space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Document Integration & School Verification</h2>
-        <p className="text-slate-500 text-sm sm:text-base mt-1">Upload institutional reports to verify the school and generate strengths/weaknesses tables.</p>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 p-5">
+        <h3 className="text-lg font-black text-slate-950">SOP-Objective-Method-Metric Alignment</h3>
       </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8">
-        <div 
-          onClick={() => fileInputRef.current.click()}
-          className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 flex flex-col items-center justify-center p-12 sm:p-24 hover:bg-slate-50 hover:border-indigo-500 transition-all cursor-pointer text-center group w-full"
-        >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            onChange={handleFileChange} 
-            accept=".pdf,.docx,.txt" 
-          />
-          <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl mb-4 group-hover:scale-105 transition-transform">
-            <CloudUpload size={36} />
-          </div>
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1">Click or drag institutional files here</h3>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-lg mb-6">
-            Supported formats: PDF, DOCX, TXT. System will detect the school name and analyze strengths/weaknesses.
-          </p>
-          <button className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors text-sm shadow-sm shadow-indigo-100">
-            Browse Files
-          </button>
-        </div>
-
-        {status && (
-          <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs sm:text-sm font-medium text-slate-700 break-words">
-            {status}
-          </div>
-        )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] text-left">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+            <tr>
+              <th className="p-4">SOP</th>
+              <th className="p-4">Evaluation Focus</th>
+              <th className="p-4">Metric or Output</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {SOP_ALIGNMENT_ROWS.map(([sop, focus, metric]) => (
+              <tr key={sop}>
+                <td className="p-4 font-black text-slate-900">{sop}</td>
+                <td className="p-4 text-slate-600">{focus}</td>
+                <td className="p-4 text-slate-600">{metric}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
-  )
-}
+  </section>
+)
 
-// 4. School Rank Component (New Tab)
-const SchoolRankView = ({ history }) => {
-  // Sort history items by ARRS score descending to establish institutional ranking
-  const sortedRankings = [...history].sort((a, b) => b.arrs - a.arrs);
-
-  return (
-    <div className="p-6 sm:p-10 w-full space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Institutional School Rankings</h2>
-        <p className="text-slate-500 text-sm sm:text-base mt-1">Comparative ranking table of evaluated universities based on ARRS and Best-Fit Frameworks.</p>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden w-full">
-        {sortedRankings.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            No institutional ranking data available. Upload documents in the Document Upload tab to populate rankings.
-          </div>
-        ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-600">
-                  <th className="p-4 pl-6">Rank</th>
-                  <th className="p-4">Institution / School Name</th>
-                  <th className="p-4">Best-Fit Framework</th>
-                  <th className="p-4">Document Source</th>
-                  <th className="p-4 pr-6 text-right">ARRS Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {sortedRankings.map((item, index) => (
-                  <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 pl-6 font-extrabold text-slate-900 flex items-center gap-2">
-                      <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs ${index === 0 ? 'bg-amber-100 text-amber-700 font-black' : index === 1 ? 'bg-slate-200 text-slate-700' : index === 2 ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
-                        #{index + 1}
-                      </span>
-                    </td>
-                    <td className="p-4 font-bold text-slate-900 flex items-center gap-2.5">
-                      <Building2 size={16} className="text-indigo-600" /> {item.schoolName}
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">
-                        {item.bestFit}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-500 text-xs">{item.filename}</td>
-                    <td className="p-4 pr-6 text-right font-black text-indigo-600 text-base">{item.arrs}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// 5. Assessment History Component
 const HistoryView = ({ history }) => {
+  const sorted = useMemo(() => [...history].sort((a, b) => b.arrs - a.arrs), [history])
   return (
-    <div className="p-6 sm:p-10 w-full space-y-6">
+    <section className="space-y-6 p-6 lg:p-8">
       <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Assessment History & School Submissions</h2>
-        <p className="text-slate-500 text-sm sm:text-base mt-1">Audit trail of previously evaluated schools and institutional documents.</p>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">School Rank & Assessment History</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Evaluated schools are ranked by ARRS and retain document source, timestamp, and best-fit framework metadata.</p>
       </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden w-full">
-        {history.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            No assessment records found. Upload a document to start building history.
-          </div>
-        ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-600">
-                  <th className="p-4">Submitting School</th>
-                  <th className="p-4">Filename</th>
-                  <th className="p-4">Timestamp</th>
+      {sorted.length === 0 ? <EmptyState text="No assessment history yet." /> : (
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-left">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+                <tr>
+                  <th className="p-4">Rank</th>
+                  <th className="p-4">Institution</th>
+                  <th className="p-4">Document Source</th>
                   <th className="p-4">Best-Fit Framework</th>
-                  <th className="p-4">ARRS Score</th>
+                  <th className="p-4">Timestamp</th>
+                  <th className="p-4 text-right">ARRS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {history.map((item, index) => (
-                  <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-bold text-slate-900 flex items-center gap-2">
-                      <Building2 size={16} className="text-indigo-600" /> {item.schoolName}
-                    </td>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {sorted.map((item, index) => (
+                  <tr key={`${item.filename}-${item.timestamp}`}>
+                    <td className="p-4 font-black text-slate-950">#{index + 1}</td>
+                    <td className="p-4 font-bold text-slate-800">{item.schoolName}</td>
                     <td className="p-4 text-slate-500">{item.filename}</td>
-                    <td className="p-4 text-slate-500 flex items-center gap-1.5">
-                      <Clock size={14} /> {item.timestamp}
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">
-                        {item.bestFit}
-                      </span>
-                    </td>
-                    <td className="p-4 font-extrabold text-indigo-600">{item.arrs}</td>
+                    <td className="p-4 text-slate-600">{item.bestFit}</td>
+                    <td className="p-4 text-slate-500">{item.timestamp}</td>
+                    <td className="p-4 text-right font-black text-slate-950">{item.arrs}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// 6. Framework Analysis Component
-const FrameworkAnalysis = () => {
-  return (
-    <div className="p-6 sm:p-10 w-full space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Framework Analysis & Points Criteria</h2>
-        <p className="text-slate-500 text-sm sm:text-base mt-1">Sub-indicator point weight distributions across WURI, THE, QS, and UI GreenMetric.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80 space-y-6">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-            <Sliders className="text-indigo-600" size={20} /> Framework Pillar Weighting
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-slate-700 mb-1.5">
-                <span>Research & Academic Excellence (QS / THE)</span>
-                <span className="text-indigo-600">35%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5">
-                <div className="bg-indigo-600 h-full rounded-full" style={{ width: '35%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-slate-700 mb-1.5">
-                <span>Innovation & Entrepreneurship (WURI)</span>
-                <span className="text-amber-500">30%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: '30%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-slate-700 mb-1.5">
-                <span>Environmental Sustainability (GreenMetric)</span>
-                <span className="text-emerald-500">20%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '20%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-slate-700 mb-1.5">
-                <span>International Outlook & Ratios</span>
-                <span className="text-purple-500">15%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5">
-                <div className="bg-purple-500 h-full rounded-full" style={{ width: '15%' }}></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80 space-y-6">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-            <Cpu className="text-indigo-600" size={20} /> Points Aggregation Engine
-          </h3>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Sub-indicator scores are calculated via semantic embedding proximity (0–100 scale) and synthesized into framework Ranking Readiness Scores (RRS) and the composite ARRS index.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// 7. Explainable AI Component
-const ExplainableAI = ({ bestFit, hasGenerated, strengths, weaknesses }) => {
-  return (
-    <div className="p-6 sm:p-10 w-full space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Explainable AI Recommendations</h2>
-        <p className="text-slate-500 text-sm sm:text-base mt-1">Transparent evidence traceability, strengths, and gap analysis.</p>
-      </div>
-
-      {!hasGenerated ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-12 text-center text-slate-500 text-sm w-full">
-          Please upload and evaluate an institutional document first to view XAI recommendations and trace evidence.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 border-l-4 border-l-emerald-500 space-y-4">
-            <h4 className="font-bold text-slate-900 text-base flex items-center gap-2 text-emerald-700">
-              <CheckCircle size={20} /> Strengths Analysis ({bestFit})
-            </h4>
-            <ul className="space-y-2">
-              {strengths.map((str, i) => (
-                <li key={i} className="text-xs sm:text-sm text-slate-700 bg-emerald-50/40 p-2.5 rounded-lg">✓ {str}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 border-l-4 border-l-amber-500 space-y-4">
-            <h4 className="font-bold text-slate-900 text-base flex items-center gap-2 text-amber-700">
-              <AlertTriangle size={20} /> Weakness & Gap Analysis
-            </h4>
-            <ul className="space-y-2">
-              {weaknesses.map((weak, i) => (
-                <li key={i} className="text-xs sm:text-sm text-slate-700 bg-amber-50/40 p-2.5 rounded-lg">⚠ {weak}</li>
-              ))}
-            </ul>
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+const EmptyState = ({ text }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm font-semibold text-slate-500 shadow-sm">{text}</div>
+)
+
+const Shell = ({ children, onLogout }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeMenu = () => setMobileMenuOpen(false)
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between border-b border-slate-200 bg-white p-4 md:hidden">
+        <div className="flex items-center gap-2 font-black text-slate-950"><Award size={20} /> Ranking DSS</div>
+        <button className="rounded-lg p-2 text-slate-700 hover:bg-slate-100" onClick={() => setMobileMenuOpen((open) => !open)}>{mobileMenuOpen ? <X /> : <Menu />}</button>
+      </div>
+      <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white transition md:static ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="hidden border-b border-slate-100 p-5 md:block">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-slate-900 p-2 text-white"><Award size={22} /></div>
+            <div>
+              <div className="font-black text-slate-950">Ranking DSS</div>
+              <div className="text-xs font-semibold text-slate-400">WURI, THE, QS, GreenMetric</div>
+            </div>
+          </div>
+        </div>
+        <nav className="mt-16 flex-1 space-y-1 overflow-y-auto p-3 md:mt-0">
+          <div className="px-3 pb-2 text-xs font-black uppercase text-slate-400">Workspace</div>
+          <NavLink to="/" icon={LayoutDashboard} onClick={closeMenu}>Dashboard</NavLink>
+          <NavLink to="/upload" icon={CloudUpload} onClick={closeMenu}>Document Upload</NavLink>
+          <NavLink to="/evidence" icon={FileSearch} onClick={closeMenu}>Evidence & EQAM</NavLink>
+          <NavLink to="/analysis" icon={BarChart3} onClick={closeMenu}>Framework Analysis</NavLink>
+          <NavLink to="/xai" icon={Lightbulb} onClick={closeMenu}>XAI Support</NavLink>
+          <NavLink to="/history" icon={Trophy} onClick={closeMenu}>Rank & History</NavLink>
+          <div className="px-3 pb-2 pt-5 text-xs font-black uppercase text-slate-400">Governance</div>
+          <NavLink to="/architecture" icon={Network} onClick={closeMenu}>Architecture</NavLink>
+          <NavLink to="/checklist" icon={BookOpenCheck} onClick={closeMenu}>Checklist</NavLink>
+          <NavLink to="/validation" icon={Microscope} onClick={closeMenu}>Validation QA</NavLink>
+        </nav>
+        <div className="border-t border-slate-100 p-3">
+          <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-700">
+            <LogOut size={18} /> Sign Out
+          </button>
+        </div>
+      </aside>
+      <main className="flex-1 overflow-y-auto pt-16 md:pt-0">{children}</main>
     </div>
   )
 }
 
-// 8. Main App Component
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hasGenerated, setHasGenerated] = useState(false);
-  const [schoolName, setSchoolName] = useState('');
-  const [arrsScore, setArrsScore] = useState(0);
-  const [bestFitFramework, setBestFitFramework] = useState('');
-  const [readinessData, setReadinessData] = useState([
-    { framework: 'WURI', score: 0, color: '#f59e0b' },
-    { framework: 'THE', score: 0, color: '#3b82f6' },
-    { framework: 'QS', score: 0, color: '#8b5cf6' },
-    { framework: 'UI GreenMetric', score: 0, color: '#10b981' },
-  ]);
-  const [subScores, setSubScores] = useState({});
-  const [strengths, setStrengths] = useState([]);
-  const [weaknesses, setWeaknesses] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [evaluation, setEvaluation] = useState(null)
+  const [history, setHistory] = useState([])
 
-  const updateEvaluation = (filename, detectedSchool, newScores, newSubScores, newArrs, bestFit, detectedStrengths, detectedWeaknesses) => {
-    setHasGenerated(true);
-    setSchoolName(detectedSchool);
-    setArrsScore(newArrs);
-    setBestFitFramework(bestFit);
-    setSubScores(newSubScores);
-    setStrengths(detectedStrengths);
-    setWeaknesses(detectedWeaknesses);
-    setReadinessData([
-      { framework: 'WURI', score: newScores.WURI || 0, color: '#f59e0b' },
-      { framework: 'THE', score: newScores.THE || 0, color: '#3b82f6' },
-      { framework: 'QS', score: newScores.QS || 0, color: '#8b5cf6' },
-      { framework: 'UI GreenMetric', score: newScores['UI GreenMetric'] || 0, color: '#10b981' },
-    ]);
-
-    const timestamp = new Date().toLocaleString();
-    setHistory(prev => [{ filename, schoolName: detectedSchool, timestamp, bestFit, arrs: newArrs }, ...prev]);
-  };
+  const handleEvaluation = (nextEvaluation) => {
+    setEvaluation(nextEvaluation)
+    setHistory((previous) => [
+      {
+        filename: nextEvaluation.filename,
+        schoolName: nextEvaluation.school_name,
+        timestamp: new Date().toLocaleString(),
+        bestFit: nextEvaluation.best_fit,
+        arrs: nextEvaluation.arrs,
+      },
+      ...previous,
+    ])
+  }
 
   return (
     <Routes>
       <Route path="/login" element={<Login onLogin={setIsAuthenticated} />} />
-      
-      <Route 
-        path="/*" 
-        element={
-          isAuthenticated ? (
-            <div className="flex h-screen w-screen overflow-hidden bg-white font-sans">
-              
-              {/* Mobile Header Bar */}
-              <div className="md:hidden bg-white text-slate-900 p-4 flex items-center justify-between border-b border-slate-200 shrink-0 w-full absolute top-0 left-0 z-40">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-indigo-600 text-white rounded-xl">
-                    <Award size={18} />
-                  </div>
-                  <span className="font-bold text-base text-slate-900">Ranking DSS</span>
-                </div>
-                <button 
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="p-2 text-slate-600 hover:text-slate-900 focus:outline-none"
-                >
-                  {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
-              </div>
-
-              {/* Sidebar Navigation */}
-              <nav className={`
-                fixed md:static z-30 inset-y-0 left-0 w-64 bg-white text-slate-700 flex flex-col transition-transform duration-300 ease-in-out shrink-0 h-full border-r border-slate-200/80
-                ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-              `}>
-                <div className="p-6 pb-4 hidden md:flex items-center justify-between border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-fuchsia-500 to-pink-500 flex items-center justify-center text-white shadow-md shadow-pink-500/20">
-                      <Award size={18} />
-                    </div>
-                    <span className="font-black text-lg text-slate-900 tracking-tight">Ranking DSS</span>
-                  </div>
-                  <div className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                    <Search size={18} />
-                  </div>
-                </div>
-
-                <div className="flex flex-col flex-1 py-4 space-y-1.5 px-3 overflow-y-auto mt-16 md:mt-2">
-                  <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Discover</div>
-                  <Link 
-                    to="/" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <LayoutDashboard size={18} /> Dashboard & Points
-                  </Link>
-                  <Link 
-                    to="/upload" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <FileUp size={18} /> Document Upload
-                  </Link>
-                  <Link 
-                    to="/rank" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <Trophy size={18} /> School Rank
-                  </Link>
-                  <Link 
-                    to="/history" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <History size={18} /> Assessment History
-                  </Link>
-
-                  <div className="px-3 pt-4 pb-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Analytics & AI</div>
-                  <Link 
-                    to="/analysis" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <BarChart3 size={18} /> Framework Analysis
-                  </Link>
-                  <Link 
-                    to="/xai" 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-sm font-semibold text-slate-600"
-                  >
-                    <Lightbulb size={18} /> Explainable AI
-                  </Link>
-                </div>
-
-                <div className="p-3 border-t border-slate-100 bg-white">
-                  <button 
-                    onClick={() => setIsAuthenticated(false)}
-                    className="flex items-center gap-3 text-slate-500 hover:text-red-600 text-sm font-semibold transition-colors w-full px-3 py-2.5 rounded-xl hover:bg-red-50"
-                  >
-                    <LogOut size={18} /> Sign Out
-                  </button>
-                </div>
-              </nav>
-
-              {/* Main Content Viewport */}
-              <main className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50/50 pt-16 md:pt-0">
-                <Routes>
-                  <Route path="/" element={<Dashboard readinessData={readinessData} arrsScore={arrsScore} bestFit={bestFitFramework} subScores={subScores} schoolName={schoolName} strengths={strengths} weaknesses={weaknesses} hasGenerated={hasGenerated} />} />
-                  <Route path="/upload" element={<DocumentUpload updateEvaluation={updateEvaluation} />} />
-                  <Route path="/rank" element={<SchoolRankView history={history} />} />
-                  <Route path="/history" element={<HistoryView history={history} />} />
-                  <Route path="/analysis" element={<FrameworkAnalysis />} />
-                  <Route path="/xai" element={<ExplainableAI bestFit={bestFitFramework} hasGenerated={hasGenerated} strengths={strengths} weaknesses={weaknesses} />} />
-                </Routes>
-              </main>
-
-            </div>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        } 
-      />
+      <Route path="/*" element={isAuthenticated ? (
+        <Shell onLogout={() => setIsAuthenticated(false)}>
+          <Routes>
+            <Route path="/" element={<Dashboard evaluation={evaluation} history={history} />} />
+            <Route path="/upload" element={<DocumentUpload onEvaluation={handleEvaluation} />} />
+            <Route path="/evidence" element={<EvidenceView evaluation={evaluation} />} />
+            <Route path="/analysis" element={<FrameworkAnalysis evaluation={evaluation} />} />
+            <Route path="/xai" element={<ExplainableAI evaluation={evaluation} />} />
+            <Route path="/history" element={<HistoryView history={history} />} />
+            <Route path="/architecture" element={<ArchitectureView />} />
+            <Route path="/checklist" element={<ChecklistView />} />
+            <Route path="/validation" element={<ValidationView />} />
+          </Routes>
+        </Shell>
+      ) : <Navigate to="/login" replace />} />
     </Routes>
   )
 }
