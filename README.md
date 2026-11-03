@@ -28,6 +28,16 @@ The frontend must not present sample passages, filename-derived institution name
 
 A backend response is not automatically valid research output merely because it is returned by an API. Assessment methodology, data provenance, expert validation, authorization, and research gates must be independently approved before real scoring or reporting.
 
+## Proposed backend design artifacts
+
+The following documents define reviewable designs only; none is implemented or approved for execution:
+
+- `docs/authentication-contract-proposed.md` — server-side identity, sessions, authorization, and browser protections.
+- `docs/database-schema-proposed.md` — logical PostgreSQL entities, tenant boundaries, provenance, and access matrix.
+- `docs/assessment-api-contract-proposed.md` — current frontend upload-response expectations and failure behavior.
+- `docs/backend-implementation-plan.md` — dependency-ordered backend workstreams and authorization gates.
+- `docs/security-hold-clearance-evidence-checklist.md` — external evidence required to reconsider the security hold.
+
 ## Recovery restrictions
 
 Until written security clearance and separate implementation/runtime authorization are recorded:
