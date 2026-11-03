@@ -31,6 +31,8 @@ The frontend currently expects a structured assessment response with these field
     "QS": 0,
     "UI GreenMetric": 0
   },
+  "strengths": ["Evidence-supported strength"],
+  "weaknesses": ["Evidence-supported gap"],
   "evidence": [
     {
       "id": "EVIDENCE-ID",
@@ -41,6 +43,7 @@ The frontend currently expects a structured assessment response with these field
       "date": "YYYY-MM-DD",
       "page": 1,
       "section": "Source section heading",
+      "split": "validation",
       "aes": 0,
       "accepted": false,
       "dimensions": {
