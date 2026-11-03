@@ -21,6 +21,7 @@ import {
   Menu,
   Microscope,
   SlidersHorizontal,
+  ShieldCheck,
   TableProperties,
   Target,
   User,
