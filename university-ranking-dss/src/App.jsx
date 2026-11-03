@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Navigate, Route, Routes, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import {
   AlertTriangle,
   Award,
@@ -20,12 +20,9 @@ import {
   LogOut,
   Menu,
   Microscope,
-  Network,
-  ShieldCheck,
   SlidersHorizontal,
   TableProperties,
   Target,
-  Trophy,
   User,
   X,
 } from 'lucide-react'
@@ -298,7 +295,6 @@ const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const navigate = useNavigate()
 
   const handleLoginSubmit = async (event) => {
     event.preventDefault()
