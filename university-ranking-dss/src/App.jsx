@@ -229,21 +229,30 @@ function isUsableBackendEvaluation(data) {
   const requiredMetadata = ['source', 'sourceType', 'date', 'extractionStatus', 'verificationStatus', 'provenance']
   if (!requiredMetadata.every((key) => typeof metadata[key] === 'string' && metadata[key].trim())) return false
   if (!metadata.provenance.trim()) return false
+  if (!Array.isArray(data.strengths) || !data.strengths.every((item) => typeof item === 'string' && item.trim())) return false
+  if (!Array.isArray(data.weaknesses) || !data.weaknesses.every((item) => typeof item === 'string' && item.trim())) return false
 
   return data.evidence.every((item) =>
     item &&
     typeof item === 'object' &&
     typeof item.id === 'string' &&
+    item.id.trim().length > 0 &&
     typeof item.passage === 'string' &&
     item.passage.trim().length > 0 &&
     typeof item.framework === 'string' &&
     requiredFrameworks.includes(item.framework) &&
     typeof item.indicator === 'string' &&
+    item.indicator.trim().length > 0 &&
     typeof item.source === 'string' &&
+    item.source.trim().length > 0 &&
     typeof item.date === 'string' &&
+    item.date.trim().length > 0 &&
     Number.isInteger(item.page) &&
     item.page > 0 &&
     typeof item.section === 'string' &&
+    item.section.trim().length > 0 &&
+    typeof item.split === 'string' &&
+    ['training', 'validation', 'test'].includes(item.split) &&
     Number.isFinite(item.aes) &&
     item.aes >= 0 &&
     item.aes <= 1 &&
@@ -448,10 +457,12 @@ const DocumentUpload = ({ onEvaluation }) => {
   const fileInputRef = useRef(null)
 
   const handleFileChange = async (event) => {
-    const file = event.target.files?.[0]
+    const input = event.currentTarget
+    const file = input.files?.[0]
     if (!file) return
 
     setStatus('Uploading document to the configured assessment API...')
+    onEvaluation(null)
     const formData = new FormData()
     formData.append('file', file)
     formData.append('document_type', documentType)
@@ -472,6 +483,9 @@ const DocumentUpload = ({ onEvaluation }) => {
     } catch (error) {
       onEvaluation(null)
       setStatus(`No assessment was generated: ${error instanceof Error ? error.message : 'Assessment API unavailable'}. No demonstration scores were substituted.`)
+    } finally {
+      // Allow the same file to be selected again to retry a failed upload.
+      input.value = ''
     }
   }
 
