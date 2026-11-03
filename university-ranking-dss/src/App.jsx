@@ -249,17 +249,50 @@ function detectSchoolName(fileName) {
 }
 
 function isUsableBackendEvaluation(data) {
-  return Boolean(
-    data &&
-    typeof data === 'object' &&
-    typeof data.school_name === 'string' &&
-    data.scores &&
-    typeof data.scores === 'object' &&
-    Number.isFinite(Number(data.arrs)) &&
-    typeof data.best_fit === 'string' &&
-    Array.isArray(data.evidence) &&
-    data.metadata &&
-    typeof data.metadata === 'object'
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false
+
+  const requiredFrameworks = FRAMEWORKS.map(({ name }) => name)
+  const scores = data.scores
+  const metadata = data.metadata
+
+  if (typeof data.school_name !== 'string' || !data.school_name.trim()) return false
+  if (typeof data.filename !== 'string' || !data.filename.trim()) return false
+  if (typeof data.best_fit !== 'string' || !data.best_fit.trim()) return false
+  if (!Number.isFinite(data.arrs) || data.arrs < 0 || data.arrs > 100) return false
+  if (!scores || typeof scores !== 'object' || Array.isArray(scores)) return false
+  if (!requiredFrameworks.every((name) => Number.isFinite(scores[name]) && scores[name] >= 0 && scores[name] <= 100)) return false
+  if (!Array.isArray(data.evidence) || data.evidence.length === 0) return false
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
+
+  const requiredMetadata = ['source', 'sourceType', 'date', 'extractionStatus', 'verificationStatus', 'provenance']
+  if (!requiredMetadata.every((key) => typeof metadata[key] === 'string' && metadata[key].trim())) return false
+  if (!metadata.provenance.trim()) return false
+
+  return data.evidence.every((item) =>
+    item &&
+    typeof item === 'object' &&
+    typeof item.id === 'string' &&
+    typeof item.passage === 'string' &&
+    item.passage.trim().length > 0 &&
+    typeof item.framework === 'string' &&
+    requiredFrameworks.includes(item.framework) &&
+    typeof item.indicator === 'string' &&
+    typeof item.source === 'string' &&
+    typeof item.date === 'string' &&
+    Number.isInteger(item.page) &&
+    item.page > 0 &&
+    typeof item.section === 'string' &&
+    Number.isFinite(item.aes) &&
+    item.aes >= 0 &&
+    item.aes <= 1 &&
+    typeof item.accepted === 'boolean' &&
+    item.dimensions &&
+    typeof item.dimensions === 'object' &&
+    EQAM_DIMENSIONS.every(([dimension]) =>
+      Number.isFinite(item.dimensions[dimension]) &&
+      item.dimensions[dimension] >= 0 &&
+      item.dimensions[dimension] <= 1
+    )
   )
 }
 
