@@ -248,96 +248,19 @@ function detectSchoolName(fileName) {
   return cleaned.length > 4 ? cleaned.replace(/\s+/g, ' ') : 'Verified Institution'
 }
 
-function buildLocalEvaluation(file) {
-  const seed = hashText(`${file.name}-${file.size}-${file.type}-${file.lastModified}`)
-  const sourceType = classifyDocument(file.name)
-  const datasetSplits = { training: 70, validation: 15, test: 15 }
-
-  const evidence = samplePassages.map((passage, index) => {
-    const framework = FRAMEWORKS[index % FRAMEWORKS.length]
-    const indicator = framework.indicators[index % framework.indicators.length][0]
-    const dimensions = Object.fromEntries(
-      EQAM_DIMENSIONS.map(([dimension], dimensionIndex) => [dimension, scoreFromSeed(seed, index + dimensionIndex * 0.41)])
-    )
-    const aes = EQAM_DIMENSIONS.reduce((sum, [dimension, weight]) => sum + dimensions[dimension] * weight, 0)
-    return {
-      id: `EV-${String(index + 1).padStart(3, '0')}`,
-      passage,
-      framework: framework.name,
-      indicator,
-      source: file.name,
-      sourceType,
-      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
-      page: index + 1,
-      section: `${sourceType} / Section ${index + 1}`,
-      split: index < 4 ? 'training' : index === 4 ? 'validation' : 'test',
-      dimensions,
-      aes: Number(aes.toFixed(3)),
-      accepted: aes >= 0.70,
-    }
-  }).sort((a, b) => b.aes - a.aes)
-
-  const topK = evidence.slice(0, 5)
-  const frameworkScores = Object.fromEntries(
-    FRAMEWORKS.map((framework, index) => {
-      const frameworkEvidence = topK.filter((item) => item.framework === framework.name)
-      const evidenceFactor = frameworkEvidence.length
-        ? frameworkEvidence.reduce((sum, item) => sum + item.aes, 0) / frameworkEvidence.length
-        : scoreFromSeed(seed, index + 2.4, 0.50, 0.28)
-      const indicatorFactor = framework.indicators.reduce((sum, [, weight], indicatorIndex) => {
-        return sum + scoreFromSeed(seed, index + indicatorIndex * 0.33, 0.48, 0.47) * weight
-      }, 0)
-      const fixedReferenceTopsis = clamp((evidenceFactor * 0.58 + indicatorFactor * 0.42 - 0) / (1 - 0))
-      return [framework.name, Math.round(fixedReferenceTopsis * 100)]
-    })
+function isUsableBackendEvaluation(data) {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    typeof data.school_name === 'string' &&
+    data.scores &&
+    typeof data.scores === 'object' &&
+    Number.isFinite(Number(data.arrs)) &&
+    typeof data.best_fit === 'string' &&
+    Array.isArray(data.evidence) &&
+    data.metadata &&
+    typeof data.metadata === 'object'
   )
-
-  const arrs = Math.round(Object.values(frameworkScores).reduce((sum, score) => sum + score, 0) / FRAMEWORKS.length)
-  const sorted = Object.entries(frameworkScores).sort((a, b) => b[1] - a[1])
-  const closeAlternatives = sorted.filter(([, score]) => sorted[0][1] - score <= 5).map(([name]) => name)
-  const bestFit = closeAlternatives.length > 1 ? `${sorted[0][0]} with close alternatives: ${closeAlternatives.slice(1).join(', ')}` : sorted[0][0]
-
-  const subScores = Object.fromEntries(
-    FRAMEWORKS.map((framework, frameworkIndex) => [
-      framework.name,
-      Object.fromEntries(
-        framework.indicators.map(([indicator, weight], indicatorIndex) => [
-          indicator,
-          Math.round(scoreFromSeed(seed, frameworkIndex + indicatorIndex * 0.29, 0.45, 0.50) * weight * 100),
-        ])
-      ),
-    ])
-  )
-
-  const strengths = topK.slice(0, 3).map((item) => `${item.indicator} has accepted evidence from ${item.sourceType} (${item.id}, AES ${item.aes}).`)
-  const weaknesses = evidence
-    .slice(-3)
-    .map((item) => `${item.indicator} needs stronger documentation; ${item.id} is ${item.accepted ? 'accepted but comparatively weak' : 'below tau = 0.70'}.`)
-
-  return {
-    filename: file.name,
-    school_name: detectSchoolName(file.name),
-    scores: frameworkScores,
-    sub_scores: subScores,
-    arrs,
-    best_fit: bestFit,
-    strengths,
-    weaknesses,
-    evidence: topK,
-    metadata: {
-      source: file.name,
-      sourceType,
-      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
-      fileSize: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-      extractionStatus: file.name.toLowerCase().endsWith('.txt') ? 'Text extracted in browser' : 'Screened; backend extraction expected for full PDF/DOCX text',
-      verificationStatus: 'Verified by filename and document screening metadata',
-      datasetSplits,
-      roleAccess: ['Administrator: manage KB', 'Evaluator: score evidence', 'Viewer: read dashboards'],
-      ahpConsistencyRatio: Number(scoreFromSeed(seed, 7, 0.03, 0.065).toFixed(3)),
-      topsisAnchors: 'ideal = 1, anti-ideal = 0',
-      tau: 0.70,
-    },
-  }
 }
 
 const NavLink = ({ to, icon: Icon, children, onClick }) => {
@@ -436,9 +359,30 @@ const Dashboard = ({ evaluation, history }) => {
     )
   }
 
+  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
+  if (!hasValidatedResult) {
+    return (
+      <section className="space-y-6 p-6 lg:p-8">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-center gap-2 font-black text-amber-900">
+            <AlertTriangle size={20} />
+            Assessment result unavailable
+          </div>
+          <p className="mt-2 text-sm text-amber-900">
+            No validated backend assessment is available. Local demonstration values are not used as institutional scores.
+            Connect an authorized assessment service and complete the approved validation process before reporting RRS or ARRS.
+          </p>
+          <Link to="/upload" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+            Return to document upload <ChevronRight size={16} />
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
   const chartData = FRAMEWORKS.map((framework) => ({
     framework: framework.name,
-    score: evaluation.scores[framework.name],
+    score: Number(evaluation.scores[framework.name]),
     color: framework.color,
   }))
 
@@ -516,26 +460,28 @@ const DocumentUpload = ({ onEvaluation }) => {
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setStatus('Screening document and attempting backend semantic evaluation...')
 
+    setStatus('Uploading document to the configured assessment API...')
     const formData = new FormData()
     formData.append('file', file)
     formData.append('document_type', documentType)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/upload', { method: 'POST', body: formData })
-      if (response.ok) {
-        const data = await response.json()
-        onEvaluation({ ...buildLocalEvaluation(file), ...data })
-        setStatus(`Backend evaluation complete for ${data.school_name || file.name}.`)
-        return
+      const response = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!response.ok) {
+        throw new Error(`Assessment API returned HTTP ${response.status}`)
       }
-      throw new Error('Backend returned an error')
-    } catch {
-      const localEvaluation = buildLocalEvaluation(file)
-      localEvaluation.metadata.sourceType = documentType
-      onEvaluation(localEvaluation)
-      setStatus('Backend unavailable. Generated a local checklist-aligned prototype evaluation from document metadata.')
+
+      const data = await response.json()
+      if (!isUsableBackendEvaluation(data)) {
+        throw new Error('The API response does not contain the required validated assessment fields.')
+      }
+
+      onEvaluation(data)
+      setStatus(`Backend assessment received for ${data.school_name}.`)
+    } catch (error) {
+      onEvaluation(null)
+      setStatus(`No assessment was generated: ${error instanceof Error ? error.message : 'Assessment API unavailable'}. No demonstration scores were substituted.`)
     }
   }
 
@@ -911,13 +857,15 @@ function App() {
 
   const handleEvaluation = (nextEvaluation) => {
     setEvaluation(nextEvaluation)
+    if (!isUsableBackendEvaluation(nextEvaluation)) return
+
     setHistory((previous) => [
       {
         filename: nextEvaluation.filename,
         schoolName: nextEvaluation.school_name,
         timestamp: new Date().toLocaleString(),
         bestFit: nextEvaluation.best_fit,
-        arrs: nextEvaluation.arrs,
+        arrs: Number(nextEvaluation.arrs),
       },
       ...previous,
     ])
