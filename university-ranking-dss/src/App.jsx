@@ -430,18 +430,17 @@ const Dashboard = ({ evaluation, history }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Accepted Top-K Evidence" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
-        <StatCard label="AHP Consistency Ratio" value={evaluation.metadata.ahpConsistencyRatio <= 0.1 ? `CR ${evaluation.metadata.ahpConsistencyRatio}` : 'Review CR'} icon={Network} />
-        <StatCard label="Frameworks Scored" value="4" icon={BarChart3} />
-        <StatCard label="Assessment Records" value={history.length} icon={History} />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Accepted Evidence Records" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
+        <StatCard label="Frameworks Included" value={FRAMEWORKS.length} icon={BarChart3} />
+        <StatCard label="Session Assessment Records" value={history.length} icon={History} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-black text-slate-950">Ranking Readiness Scores</h3>
-            <span className="text-xs font-bold text-slate-500">Fixed-reference TOPSIS anchors: {evaluation.metadata.topsisAnchors}</span>
+            <span className="text-xs font-bold text-slate-500">Backend-provided framework results</span>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -465,11 +464,9 @@ const Dashboard = ({ evaluation, history }) => {
               ['Source', evaluation.metadata.source],
               ['Document class', evaluation.metadata.sourceType],
               ['Date', evaluation.metadata.date],
-              ['Size', evaluation.metadata.fileSize],
               ['Extraction', evaluation.metadata.extractionStatus],
               ['Verification', evaluation.metadata.verificationStatus],
-              ['Dataset split', `${evaluation.metadata.datasetSplits.training}/${evaluation.metadata.datasetSplits.validation}/${evaluation.metadata.datasetSplits.test}`],
-              ['Access roles', evaluation.metadata.roleAccess.join('; ')],
+              ['Provenance', evaluation.metadata.provenance],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg bg-slate-50 p-3">
                 <dt className="text-xs font-black uppercase text-slate-400">{label}</dt>
