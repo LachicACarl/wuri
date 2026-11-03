@@ -527,14 +527,16 @@ const DocumentUpload = ({ onEvaluation }) => {
   )
 }
 
-const EvidenceView = ({ evaluation }) => (
+const EvidenceView = ({ evaluation }) => {
+  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
+  return (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
       <h2 className="text-3xl font-black tracking-normal text-slate-950">Semantic Evidence & EQAM</h2>
       <p className="mt-2 max-w-3xl text-sm text-slate-500">Top-K evidence candidates are mapped to ranking indicators and scored across the five EQAM dimensions. Acceptance threshold tau = 0.70.</p>
     </div>
-    {!evaluation ? (
-      <EmptyState text="Upload a document to view retrieved evidence." />
+    {!hasValidatedResult ? (
+      <EmptyState text="Validated backend evidence is unavailable. No sample or metadata-derived evidence is displayed." />
     ) : (
       <div className="grid grid-cols-1 gap-4">
         {evaluation.evidence.map((item) => (
@@ -569,7 +571,8 @@ const EvidenceView = ({ evaluation }) => (
       </div>
     )}
   </section>
-)
+  )
+}
 
 const FrameworkAnalysis = ({ evaluation }) => (
   <section className="space-y-6 p-6 lg:p-8">
@@ -611,14 +614,16 @@ const FrameworkAnalysis = ({ evaluation }) => (
   </section>
 )
 
-const ExplainableAI = ({ evaluation }) => (
+const ExplainableAI = ({ evaluation }) => {
+  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
+  return (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
       <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI & Decision Support</h2>
       <p className="mt-2 max-w-3xl text-sm text-slate-500">Administrators can inspect score drivers, trace evidence, and identify readiness gaps by framework and criterion.</p>
     </div>
-    {!evaluation ? (
-      <EmptyState text="Upload a document to generate explanations." />
+    {!hasValidatedResult ? (
+      <EmptyState text="Validated backend explanations are unavailable. No generated sample findings are displayed." />
     ) : (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
@@ -636,7 +641,8 @@ const ExplainableAI = ({ evaluation }) => (
       </div>
     )}
   </section>
-)
+  )
+}
 
 const ChecklistView = () => (
   <section className="space-y-6 p-6 lg:p-8">
