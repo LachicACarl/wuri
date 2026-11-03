@@ -1,11 +1,9 @@
-# Dependency directories (re-created from reviewed lockfiles)
+# Installed dependencies must be restored only from reviewed lockfiles
 node_modules/
 **/node_modules/
 
 # Build output
-dist/
 **/dist/
-build/
 **/build/
 
 # Local environment and secrets
@@ -13,6 +11,6 @@ build/
 .env.*
 !.env.example
 
-# Logs and local caches
+# Logs and local files
 *.log
 .DS_Store
