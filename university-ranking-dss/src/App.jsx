@@ -144,14 +144,6 @@ const GOVERNANCE_ROWS = [
   ['Viewer', 'Read dashboards, reports, XAI explanations, and approved assessment history'],
 ]
 
-const samplePassages = [
-  'The university expanded industry-linked innovation hubs, startup incubation, and student enterprise grants across all colleges.',
-  'Research productivity increased through indexed publications, citation mentoring, faculty profiles, and externally funded projects.',
-  'Campus sustainability reports document renewable energy use, water conservation, waste segregation, and low-emission transport.',
-  'Internationalization policies support exchange programs, visiting professors, global partnerships, and mobility scholarships.',
-  'Extension programs demonstrate measurable community outcomes through livelihood, health, education, and disaster response initiatives.',
-  'The strategic plan establishes quality assurance, accreditation readiness, data governance, and evidence-based institutional planning.',
-]
 
 const checklistGroups = [
   {
@@ -217,36 +209,6 @@ const checklistGroups = [
   },
 ]
 
-function clamp(value, min = 0, max = 1) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function hashText(text) {
-  return [...text].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)
-}
-
-function scoreFromSeed(seed, offset = 0, floor = 0.52, span = 0.43) {
-  const wave = Math.abs(Math.sin(seed * 0.017 + offset) * 10000)
-  return Number((floor + (wave % 1000) / 1000 * span).toFixed(3))
-}
-
-function classifyDocument(fileName) {
-  const name = fileName.toLowerCase()
-  if (name.includes('sustain')) return 'Sustainability report'
-  if (name.includes('research') || name.includes('publication')) return 'Research publication'
-  if (name.includes('faculty')) return 'Faculty profile'
-  if (name.includes('extension')) return 'Extension report'
-  if (name.includes('policy')) return 'Institutional policy'
-  if (name.includes('accredit')) return 'Accreditation report'
-  if (name.includes('annual') || name.includes('accomplishment')) return 'Annual/accomplishment report'
-  return 'Strategic plan'
-}
-
-function detectSchoolName(fileName) {
-  const base = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
-  const cleaned = base.replace(/\b(strategic|plan|annual|report|accreditation|research|sustainability|extension|policy|faculty|profile|202\d)\b/gi, '').trim()
-  return cleaned.length > 4 ? cleaned.replace(/\s+/g, ' ') : 'Verified Institution'
-}
 
 function isUsableBackendEvaluation(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return false
@@ -800,8 +762,8 @@ const HistoryView = ({ history }) => {
   return (
     <section className="space-y-6 p-6 lg:p-8">
       <div>
-        <h2 className="text-3xl font-black tracking-normal text-slate-950">School Rank & Assessment History</h2>
-        <p className="mt-2 max-w-3xl text-sm text-slate-500">Evaluated schools are ranked by ARRS and retain document source, timestamp, and best-fit framework metadata.</p>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">Assessment Session History</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">This session-only list contains validated backend responses received during the current browser session. It is not an official university ranking.</p>
       </div>
       {sorted.length === 0 ? <EmptyState text="No assessment history yet." /> : (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
