@@ -75,7 +75,17 @@ The frontend calls `POST /api/upload`, but this repository does not currently co
 
 **Acceptance evidence:** reviewed schema, migration plan, least-privilege review, restore test, and owner approval.
 
-## 3. Required authorization gates
+## 3. Reviewable design artifacts now available
+
+These specifications were added for review while the hold remains active:
+
+- `docs/authentication-contract-proposed.md`: server-managed sessions, endpoint surface, role checks, CSRF/CORS, and fail-closed behavior.
+- `docs/database-schema-proposed.md`: logical tenant-scoped entities, evidence provenance, assessment versioning, audit events, and server-enforced access matrix.
+- `docs/assessment-api-contract-proposed.md`: the existing frontend upload request/response shape and required failure semantics.
+
+They are deliberately logical/proposed designs. They do not establish an approved identity provider, database, storage service, methodology, or runtime.
+
+## 4. Required authorization gates
 
 | Gate | Required evidence | Current status |
 |---|---|---|
@@ -87,13 +97,13 @@ The frontend calls `POST /api/upload`, but this repository does not currently co
 | Research-data authorization | Approved methodology, corpus, privacy, and data-processing permission | NOT GRANTED |
 | Production authorization | Independent release review and explicit deployment approval | NOT GRANTED |
 
-## 4. Safe next actions
+## 5. Safe next actions
 
 While the hold remains active, permitted work is limited to static repository inspection and documentation that does not execute project code or trigger workflows. Preserve the suspicious history as evidence. Do not merge this recovery branch into `main`.
 
 Once security clearance is independently documented, request each authorization separately and record the exact commit, scope, environment, and permitted commands. A general request to continue work is not a substitute for those approvals.
 
-## 5. Definition of done
+## 6. Definition of done
 
 The backend is not complete merely because endpoints respond. Completion requires:
 - server-enforced authentication and authorization;
