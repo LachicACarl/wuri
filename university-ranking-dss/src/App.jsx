@@ -16,7 +16,6 @@ import {
   KeyRound,
   LayoutDashboard,
   Lightbulb,
-  Lock,
   LogOut,
   Menu,
   Network,
@@ -26,7 +25,6 @@ import {
   TableProperties,
   Target,
   Trophy,
-  User,
   X,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -294,53 +292,23 @@ const StatCard = ({ label, value, icon: Icon }) => (
   </div>
 )
 
-const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-
-  const handleLoginSubmit = async (event) => {
-    event.preventDefault()
-    setError('Authentication is not configured. Sign-in is disabled until an approved backend authentication service is connected.')
-    onLogin(false)
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl">
-        <div className="mb-8">
-          <div className="mb-4 inline-flex rounded-lg bg-slate-900 p-3 text-white">
-            <Award size={28} />
-          </div>
-          <h1 className="text-3xl font-black tracking-normal text-slate-950">Ranking Readiness DSS</h1>
-          <p className="mt-2 text-sm text-slate-500">Sign-in is disabled until server-side authentication is configured and security-reviewed.</p>
+const Login = () => (
+  <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl">
+      <div className="mb-6">
+        <div className="mb-4 inline-flex rounded-lg bg-slate-900 p-3 text-white">
+          <Award size={28} />
         </div>
-        <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-          {error || 'Authentication unavailable. The workspace remains locked.'}
-        </div>
-        <form onSubmit={handleLoginSubmit} className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Username</span>
-            <span className="relative block">
-              <User className="absolute left-3 top-3 text-slate-400" size={18} />
-              <input className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={username} onChange={(event) => setUsername(event.target.value)} />
-            </span>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Password</span>
-            <span className="relative block">
-              <Lock className="absolute left-3 top-3 text-slate-400" size={18} />
-              <input type="password" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={password} onChange={(event) => setPassword(event.target.value)} />
-            </span>
-          </label>
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800">
-            Sign In <ChevronRight size={18} />
-          </button>
-        </form>
+        <h1 className="text-3xl font-black tracking-normal text-slate-950">Ranking Readiness DSS</h1>
+        <p className="mt-2 text-sm text-slate-500">Workspace access is temporarily unavailable.</p>
+      </div>
+      <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="font-bold">Authentication service not configured</div>
+        <p className="mt-2">Sign-in is disabled until server-side authentication, role permissions, and security review are complete. Do not enter account credentials on this page.</p>
       </div>
     </div>
-  )
-}
+  </div>
+)
 
 const Dashboard = ({ evaluation, history }) => {
   if (!evaluation) {
@@ -882,7 +850,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<Login onLogin={setIsAuthenticated} />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/*" element={isAuthenticated ? (
         <Shell onLogout={() => setIsAuthenticated(false)}>
           <Routes>
