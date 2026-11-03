@@ -19,11 +19,13 @@ import {
   Lock,
   LogOut,
   Menu,
+  Network,
   Microscope,
   SlidersHorizontal,
   ShieldCheck,
   TableProperties,
   Target,
+  Trophy,
   User,
   X,
 } from 'lucide-react'
