@@ -296,14 +296,10 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleLoginSubmit = (event) => {
+  const handleLoginSubmit = async (event) => {
     event.preventDefault()
-    if (username === 'admin' && password === 'admin123') {
-      onLogin(true)
-      navigate('/')
-      return
-    }
-    setError('Invalid username or password. Try admin / admin123.')
+    setError('Authentication is not configured. Sign-in is disabled until an approved backend authentication service is connected.')
+    onLogin(false)
   }
 
   return (
@@ -314,9 +310,11 @@ const Login = ({ onLogin }) => {
             <Award size={28} />
           </div>
           <h1 className="text-3xl font-black tracking-normal text-slate-950">Ranking Readiness DSS</h1>
-          <p className="mt-2 text-sm text-slate-500">Enhanced SBERT, EQAM, constrained AHP, and fixed-reference TOPSIS.</p>
+          <p className="mt-2 text-sm text-slate-500">Sign-in is disabled until server-side authentication is configured and security-reviewed.</p>
         </div>
-        {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+        <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          {error || 'Authentication unavailable. The workspace remains locked.'}
+        </div>
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Username</span>
