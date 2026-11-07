@@ -63,7 +63,7 @@ class DocumentProcessingTests(unittest.TestCase):
 
     def test_docx_rejects_invalid_zip_and_missing_required_parts(self):
         with self.assertRaisesRegex(ValueError, "valid ZIP archive"):
-            extract_blocks("broken.docx", b"PK\\x03\\x04not-a-zip")
+            extract_blocks("broken.docx", b"PK\x03\x04not-a-zip")
         output = BytesIO()
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("[Content_Types].xml", "<Types/>")
