@@ -127,7 +127,7 @@ class ResearchApiTests(unittest.TestCase):
         )
         self.assertEqual(blocked.status_code, 429)
         reopened = Database(Path(self.directory.name) / "api.sqlite3")
-        rate_key = __import__("hashlib").sha256(b"testclient").hexdigest()
+        rate_key = __import__("hashlib").sha256(b"account:testclient:research-admin").hexdigest()
         self.assertGreater(reopened.login_rate_limit_status(rate_key), 0)
 
     def test_login_rejects_weak_session_secret(self):
