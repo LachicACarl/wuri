@@ -19,15 +19,15 @@
 | Entity | Purpose | Important fields / constraints |
 |---|---|---|
 | institutions | Tenant boundary | id, display_name, status, created_at |
-| users | Server-managed identity profile | id from approved identity provider, email, status, created_at |
+| users | Server-managed identity profile | id from approved identity provider (provider and subject namespace recorded), email, status, created_at, updated_at |
 | institution_memberships | User-to-institution role | user_id, institution_id, role; unique(user_id, institution_id); role in administrator/evaluator/viewer |
 | documents | Uploaded document metadata | id, institution_id, uploader_id, document_type, original_filename, storage_key, sha256, byte_size, detected_media_type, status, created_at, updated_at |
 | extraction_runs | Extraction attempt and provenance | id, document_id, tool_name, tool_version, status, started_at, completed_at, failure_code |
-| evidence_items | Source-grounded extracted passage | id, extraction_run_id, institution_id, passage_text, page_number, section_label, character_start, character_end, source_hash |
+| evidence_items | Source-grounded extracted passage | id, extraction_run_id, institution_id, passage_text, page_number, section_label, character_start, character_end, source_hash; unique within an extraction run where stable source offsets permit |
 | evidence_mappings | Evidence-to-framework indicator mapping | id, evidence_id, framework_code, indicator_code, mapping_model_version, relevance_value, review_status, reviewer_id |
 | assessment_runs | One versioned assessment execution | id, institution_id, document_id, requested_by, status, idempotency_key (scoped to requester/institution), methodology_version, model_version, extractor_version, contract_version, started_at, completed_at, failure_code |
 | evidence_quality | EQAM values for a specific run/evidence pair | assessment_run_id, evidence_id, semantic_relevance, model_confidence, completeness, source_reliability, evidence_strength, aes, accepted |
-| framework_scores | Per-framework output | assessment_run_id, framework_code, rrs, calculation_version; unique(assessment_run_id, framework_code) |
+| framework_scores | Per-framework output | assessment_run_id, framework_code, score_value (approved unit/range to be defined), calculation_version; unique(assessment_run_id, framework_code) |
 | aggregate_scores | Aggregate and best-fit output | assessment_run_id, arrs, best_fit_code, aggregation_version |
 | assessment_explanations | Evidence-supported strengths, gaps, and explanation references | id, assessment_run_id, category, explanation_text, evidence references |
 | audit_events | Security and governance trail | id, actor_id, institution_id, action, target_type, target_id, request_id, occurred_at, redacted_metadata |
@@ -48,13 +48,14 @@ This is a logical model. Column types, indexes, foreign-key delete behavior, enc
 
 1. Foreign keys must prevent evidence or assessment records from silently becoming detached from their source document and institution.
 2. Unique constraints must prevent duplicate membership roles and duplicate framework score rows for the same assessment run.
-3. Scores must be constrained to approved numeric ranges; a database range check does not prove methodological validity.
+3. Scores must be constrained to approved numeric ranges and units defined by a versioned methodology; a database range check does not prove methodological validity. Do not assume every framework produces an `RRS` field with identical semantics.
 4. Evidence page numbers must be positive when known. Unknown page/section values must be represented explicitly, never guessed.
 5. Assessment status transitions must be controlled by the backend through an explicit allowed-transition table; terminal states must not silently return to processing or completed.
 6. Idempotency keys must be unique within a defined tenant/requester scope and must not permit a repeated request to create duplicate assessment runs.
-7. A completed assessment requires all required calculation artifacts, provenance, and immutable methodology/model/contract version references.
-8. The API must not expose storage keys, private passage text, or assessment data unless the caller is authorized for that institution and resource.
-9. Audit metadata must be redacted; do not record passwords, session tokens, API keys, or raw secrets.
+7. A completed assessment requires all required calculation artifacts, provenance, and immutable methodology, model, extractor, and contract version references.
+8. A completed assessment must have exactly the result rows required by its approved methodology; partial output must be represented as an explicitly non-completed state, not silently presented as a final result.
+9. The API must not expose storage keys, private passage text, or assessment data unless the caller is authorized for that institution and resource.
+10. Audit metadata must be redacted; do not record passwords, session tokens, API keys, or raw secrets.
 
 ## 5. Access-control matrix (server enforced)
 
@@ -93,9 +94,11 @@ No public bucket, client-side service-role key, user-controlled storage path, or
 - Final methodology/data dictionary for framework indicators and EQAM dimensions.
 - Audit retention, backup/restore objectives, and operational ownership.
 - Whether database row-level security is required in addition to server-side authorization, and how policies will be independently reviewed.
-- Exact idempotency-key scope, retention period, request fingerprinting, and conflict behavior.
-- The allowed state machine for document, extraction, and assessment records, including retry and terminal-failure semantics.
-- Uniqueness/immutability rules for methodology, model, extractor, and API contract versions.
+- Exact idempotency-key scope, retention period, request fingerprinting, and conflict behavior. A key reused with a different authenticated principal, tenant, or request fingerprint must not replay another user's resource.
+- The allowed state machine for document, extraction, and assessment records, including retry and terminal-failure semantics. Specify which transitions require immutable event/audit records and how abandoned processing is recovered.
+- Uniqueness/immutability rules for methodology, model, extractor, and API contract versions, including a registry or immutable version table and foreign-key references from assessment runs.
+- Stable mapping of framework codes and indicator codes to a governed versioned data dictionary.
+- Identity-provider subject namespace and tenant-safe mapping of provider identities to internal user IDs.
 - Cascading delete versus tombstone/legal-hold behavior across documents, evidence, and assessment records.
 
 ## 8. Approval gates
