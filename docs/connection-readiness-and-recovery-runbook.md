@@ -1,7 +1,8 @@
 # WURI Connection Readiness and Recovery Runbook
 
 **Status: HOLD — NOT CONNECTED END-TO-END**  
-**Target branch:** `security/recovery-remove-obfuscated-vite-config`  
+**Original remediation branch:** `security/recovery-remove-obfuscated-vite-config` (historical; not the current isolated clean-root snapshot)  
+**Current isolated review snapshot:** `security/clean-root-quarantine-2026-11-07`  
 **Supabase project ref:** `oxvejessjvlsyptqfyyc`  
 **This document is a static planning artifact. It does not authorize runtime execution, database access, migrations, or deployment.**
 
@@ -10,10 +11,10 @@
 - The Supabase account named `wuri` lists project `oxvejessjvlsyptqfyyc`.
 - The project was reported as `ACTIVE_HEALTHY`, region `ap-northeast-2`, PostgreSQL 17.
 - The frontend exists under `university-ranking-dss/`.
-- The frontend expects `POST /api/upload`.
+- The earlier frontend prototype expected `POST /api/upload`; that request, form, and file input were subsequently removed from the current clean-root snapshot. No upload endpoint exists.
 - No backend/API implementation was found in the inspected recovery-branch tree.
 - Authentication remains intentionally locked pending an approved server-side implementation.
-- The recovery branch is 24 commits ahead of `main`; its merge base is suspicious commit `8595267641138faf240e9bd0a27b9f565bf3734f`. Current-branch replacement of the suspicious Vite config does not remove the historical commit.
+- The original recovery branch inherits suspicious history and must not be merged. The separate clean-root snapshot was created with an orphan root commit, but copied source remains unreviewed and is not cleared to execute.
 
 Project listing/status confirms account access and project existence only. It does not confirm application connectivity, database schema readiness, RLS correctness, storage policies, auth configuration, API availability, or key rotation.
 
@@ -117,3 +118,10 @@ Only after explicit runtime/database authorization, verify in this order:
 Stop immediately if a secret is found in source/logs, unexpected project identity is observed, RLS permits cross-tenant access, storage is public unexpectedly, document provenance is incomplete, or a result appears without a validated assessment run. Preserve evidence and notify the authorized reviewer/owner.
 
 **No implementation, runtime connection, database inspection/change, credential operation, CI execution, or deployment has been performed by adding this runbook.**
+
+
+## Current clean-root snapshot correction — 2026-11-07
+
+The current isolated snapshot is `security/clean-root-quarantine-2026-11-07`, not the original recovery branch named above. Its frontend is a static security-hold page only. It contains no upload request or file input, no backend/API handler, no authentication service, no Supabase client, and no assessment implementation. This snapshot is a source-review artifact and is not an operational system.
+
+All implementation, dependency installation, source execution, build/lint/test, CI, Supabase access, migration, real-data processing, and deployment remain unauthorized pending the gates in issue #1.
