@@ -1,16 +1,24 @@
-# React + Vite
+# WURI Ranking Readiness DSS — Frontend Snapshot
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This folder contains a **quarantined, non-operational frontend snapshot**. The application currently renders only a security-hold notice. It is not a functioning ranking-readiness system.
 
-Currently, two official plugins are available:
+## Technology stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Area | Technology | Evidence in this repository |
+|---|---|---|
+| Programming language | JavaScript (ES modules) | `package.json` uses `"type": "module"`; source/config files use `.js` and `.jsx` |
+| UI library | React 18 | `react` and `react-dom` dependencies |
+| Component syntax | JSX | `src/App.jsx`, `src/main.jsx` |
+| Frontend build/dev server | Vite | `vite.config.js` and Vite scripts |
+| Styling | CSS + Tailwind CSS 4 | `src/index.css`, Tailwind import and Vite plugin |
+| Routing | React Router 7 | `BrowserRouter`, `Routes`, and `Route` |
+| Icons | Lucide React | `ShieldCheck` in `src/App.jsx` |
+| Static code analysis config | ESLint | `eslint.config.js` |
 
-## React Compiler
+There is currently **no backend implementation or backend programming language** in this repository snapshot. Python/FastAPI, Node.js API services, Supabase integration, authentication, document processing, and ranking algorithms are not implemented here.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Important status
 
-## Expanding the ESLint configuration
+Do not upload institutional documents or enter credentials. The security-hold screen is intentional until independent security review, credential containment, and explicit implementation/runtime authorization are complete.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+No dependencies have been installed and no build, lint, test, or runtime command has been executed for this snapshot.
