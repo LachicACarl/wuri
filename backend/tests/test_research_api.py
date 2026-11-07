@@ -57,7 +57,7 @@ class ResearchApiTests(unittest.TestCase):
         self.environment = patch.dict(os.environ, {
             "WURI_ADMIN_USERNAME": "research-admin",
             "WURI_ADMIN_PASSWORD": "local-test-password-long",
-            "WURI_SESSION_SECRET": "research-test-session-secret",
+            "WURI_SESSION_SECRET": "research-test-session-secret-32-bytes-minimum",
             "WURI_SBERT_MODEL_PATH": "",
             "WURI_ENVIRONMENT": "development",
             "SESSION_COOKIE_SECURE": "false",
@@ -102,12 +102,41 @@ class ResearchApiTests(unittest.TestCase):
         )
         self.assertEqual(self.client.get("/api/auth/session").status_code, 401)
 
-    def test_logout_clears_session_cookie_and_requires_login(self):
+    def test_logout_revokes_copied_session_token_server_side(self):
         self.login()
+        stolen_token = self.client.cookies.get(main.SESSION_COOKIE)
+        self.assertTrue(stolen_token)
         response = self.client.post("/api/auth/logout")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["authenticated"])
         self.assertEqual(self.client.get("/api/auth/session").status_code, 401)
+        self.client.cookies.set(main.SESSION_COOKIE, stolen_token)
+        self.assertEqual(self.client.get("/api/auth/session").status_code, 401)
+
+    def test_login_throttling_persists_and_blocks_after_five_failures(self):
+        for attempt in range(5):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": "research-admin", "password": "definitely-wrong-password"},
+            )
+        self.assertEqual(response.status_code, 429)
+        self.assertGreater(int(response.headers["Retry-After"]), 0)
+        blocked = self.client.post(
+            "/api/auth/login",
+            json={"username": "research-admin", "password": "local-test-password-long"},
+        )
+        self.assertEqual(blocked.status_code, 429)
+        reopened = Database(Path(self.directory.name) / "api.sqlite3")
+        rate_key = __import__("hashlib").sha256(b"account:testclient:research-admin").hexdigest()
+        self.assertGreater(reopened.login_rate_limit_status(rate_key), 0)
+
+    def test_login_rejects_weak_session_secret(self):
+        with patch.dict(os.environ, {"WURI_SESSION_SECRET": "too-short"}, clear=False):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": "research-admin", "password": "local-test-password-long"},
+            )
+        self.assertEqual(response.status_code, 503)
 
     def test_session_cookie_is_secure_by_default_and_local_override_is_explicit(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -121,6 +150,21 @@ class ResearchApiTests(unittest.TestCase):
         with patch.dict(os.environ, {"SESSION_COOKIE_SECURE": "false"}, clear=True):
             with self.assertRaises(main.HTTPException):
                 main.session_cookie_secure()
+
+    def test_upload_parser_exception_cleans_temporary_file(self):
+        self.login()
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(list(self.storage.root.iterdir()), [])
 
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
@@ -205,7 +249,7 @@ class ResearchApiTests(unittest.TestCase):
                     "criterion_id": criterion_id,
                     "title": "Synthetic acceptance evidence",
                 },
-                files={"file": ("acceptance.txt", b"Synthetic acceptance evidence.", "text/plain")},
+                files={"file": ('acceptance"bad.txt', b"Synthetic acceptance evidence.", "text/plain")},
             )
         self.assertEqual(response.status_code, 200, response.text)
         document_id = response.json()["document"]["document_id"]
@@ -258,6 +302,10 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(updated.status_code, 200, updated.text)
         downloaded = self.client.get(f"/api/documents/{document_id}/download")
         self.assertEqual(downloaded.status_code, 200)
+        self.assertEqual(
+            downloaded.headers["content-disposition"],
+            "attachment; filename*=UTF-8''acceptance%22bad.txt",
+        )
         deleted = self.client.delete(f"/api/documents/{document_id}")
         self.assertEqual(deleted.status_code, 200, deleted.text)
         self.assertEqual(self.client.get(f"/api/assessments/{assessment_id}").status_code, 200)
@@ -268,8 +316,11 @@ class ResearchApiTests(unittest.TestCase):
             )
 
     def _act_as(self, user_id):
-        token = main.create_session_token(
-            user_id, os.environ["WURI_SESSION_SECRET"]
+        secret = os.environ["WURI_SESSION_SECRET"]
+        token = main.create_session_token(user_id, secret)
+        claims = main.read_session_claims(token, secret)
+        self.database.create_session(
+            str(claims["session_id"]), user_id, int(claims["expires_at"])
         )
         self.client.cookies.set(main.SESSION_COOKIE, token)
 
@@ -510,8 +561,11 @@ class ResearchApiTests(unittest.TestCase):
             second_reviews.append(second_review)
 
         def act_as(reviewer_id):
-            token = main.create_session_token(
-                reviewer_id, os.environ["WURI_SESSION_SECRET"]
+            secret = os.environ["WURI_SESSION_SECRET"]
+            token = main.create_session_token(reviewer_id, secret)
+            claims = main.read_session_claims(token, secret)
+            self.database.create_session(
+                str(claims["session_id"]), reviewer_id, int(claims["expires_at"])
             )
             self.client.cookies.set(main.SESSION_COOKIE, token)
 

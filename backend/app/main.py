@@ -2,12 +2,14 @@ import os
 import json
 import math
 import sqlite3
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import Cookie, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import Cookie, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,7 +25,10 @@ from .research_validation import ablation_statuses, split_evidence_dataset
 from .research_import import (
     MAX_IMPORT_BYTES, parse_research_upload, validate_research_records,
 )
-from .security import SESSION_COOKIE, create_session_token, hash_password, read_session_token, verify_password
+from .security import (
+    SESSION_COOKIE, SESSION_TTL_SECONDS, create_session_token, hash_password,
+    read_session_claims, validate_session_secret, verify_password,
+)
 from .storage import PrivateStorage
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -312,28 +317,75 @@ def update_evidence_readiness(
 
 
 @app.post("/api/auth/login")
-def login(request: LoginRequest, response: Response):
+def login(request: LoginRequest, response: Response, http_request: Request):
     configured_username = os.getenv("WURI_ADMIN_USERNAME")
     configured_password = os.getenv("WURI_ADMIN_PASSWORD")
-    if not configured_username or not configured_password:
-        raise HTTPException(status_code=503, detail="Authentication is not configured.")
     try:
-        database.ensure_admin(configured_username.strip().lower(), hash_password(configured_password))
+        secret = validate_session_secret(os.getenv("WURI_SESSION_SECRET"))
     except ValueError as error:
         raise HTTPException(status_code=503, detail="Authentication configuration is invalid.") from error
-    user = database.user_by_username(request.username.strip().lower())
-    if not user or user["status"] != "active" or not verify_password(request.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials.")
-    secret = os.getenv("WURI_SESSION_SECRET")
-    if not secret:
+    if not configured_username or not configured_password:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
+
+    # Use the direct ASGI peer address. Do not trust X-Forwarded-For unless a
+    # separately configured trusted-proxy layer sanitizes it.
+    client_host = http_request.client.host if http_request.client else "unknown"
+    normalized_login = request.username.strip().lower()
+    ip_rate_key = hashlib.sha256(f"ip:{client_host}".encode("utf-8")).hexdigest()
+    account_rate_key = hashlib.sha256(
+        f"account:{client_host}:{normalized_login}".encode("utf-8")
+    ).hexdigest()
+    retry_after = max(
+        database.login_rate_limit_status(account_rate_key),
+        database.login_rate_limit_status(ip_rate_key),
+    )
+    if retry_after:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    normalized_admin = configured_username.strip().lower()
+    if not database.user_by_username(normalized_admin):
+        try:
+            database.ensure_admin(normalized_admin, hash_password(configured_password))
+        except ValueError as error:
+            raise HTTPException(status_code=503, detail="Authentication configuration is invalid.") from error
+
+    user = database.user_by_username(normalized_login)
+    if not user or user["status"] != "active" or not verify_password(request.password, user["password_hash"]):
+        account_retry = database.record_login_failure(
+            account_rate_key, max_attempts=5, window_seconds=900
+        )
+        ip_retry = database.record_login_failure(
+            ip_rate_key, max_attempts=20, window_seconds=900
+        )
+        retry_after = max(account_retry, ip_retry)
+        if retry_after:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed login attempts. Try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
+
+    database.clear_login_failures(account_rate_key)
+    database.clear_login_failures(ip_rate_key)
+    token = create_session_token(user["id"], secret)
+    claims = read_session_claims(token, secret)
+    if not claims:
+        raise HTTPException(status_code=503, detail="Unable to establish an authenticated session.")
+    database.create_session(
+        str(claims["session_id"]), user["id"], int(claims["expires_at"])
+    )
     response.set_cookie(
         SESSION_COOKIE,
-        create_session_token(user["id"], secret),
+        token,
         httponly=True,
         secure=session_cookie_secure(),
         samesite="lax",
-        max_age=3600,
+        max_age=SESSION_TTL_SECONDS,
     )
     return {"authenticated": True}
 
@@ -352,7 +404,14 @@ def session_status(session: str | None = Cookie(default=None, alias=SESSION_COOK
 
 
 @app.post("/api/auth/logout")
-def logout(response: Response):
+def logout(
+    response: Response,
+    session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+):
+    secret = os.getenv("WURI_SESSION_SECRET")
+    claims = read_session_claims(session, secret) if secret else None
+    if claims:
+        database.revoke_session(str(claims["session_id"]))
     response.delete_cookie(
         SESSION_COOKIE,
         httponly=True,
@@ -364,12 +423,16 @@ def logout(response: Response):
 
 def current_user(session: str | None):
     secret = os.getenv("WURI_SESSION_SECRET")
-    user_id = read_session_token(session, secret) if secret else None
-    user = database.user(user_id) if user_id else None
+    claims = read_session_claims(session, secret) if secret else None
+    if not claims:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = str(claims["user_id"])
+    if not database.session_is_active(str(claims["session_id"]), user_id):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user = database.user(user_id)
     if not user or user["status"] != "active":
         raise HTTPException(status_code=401, detail="Authentication required.")
     return user
-
 
 def session_cookie_secure() -> bool:
     requested = os.getenv("SESSION_COOKIE_SECURE", "true").strip().lower()
@@ -419,6 +482,24 @@ def _validate_upload_content(extension: str, content: bytes):
         raise HTTPException(status_code=415, detail="The uploaded file is not a valid DOCX archive.")
 
 
+async def _read_upload_limited(file: UploadFile) -> bytes:
+    """Read an upload without buffering more than the configured size limit."""
+    chunks = []
+    total = 0
+    try:
+        while True:
+            chunk = await file.read(min(1024 * 1024, MAX_UPLOAD_BYTES + 1 - total))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="The uploaded document exceeds the 25 MB limit.")
+            chunks.append(chunk)
+    finally:
+        await file.close()
+    return b"".join(chunks)
+
+
 @app.post("/api/upload")
 async def upload_document(
     file: UploadFile = File(...),
@@ -449,11 +530,9 @@ async def upload_document(
     if extension not in SUPPORTED_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Only PDF, DOCX, and TXT files are supported.")
 
-    content = await file.read()
+    content = await _read_upload_limited(file)
     if not content:
         raise HTTPException(status_code=400, detail="The uploaded document is empty.")
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="The uploaded document exceeds the 25 MB limit.")
     _validate_upload_content(extension, content)
 
     storage_key = None
@@ -469,10 +548,17 @@ async def upload_document(
         if storage_key:
             storage.delete(storage_key)
         raise
-    except (OSError, UnicodeDecodeError, ValueError, RuntimeError) as error:
+    except Exception as error:
+        # Parser libraries can raise format-specific exceptions outside the
+        # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
         if storage_key:
-            storage.delete(storage_key)
-        raise HTTPException(status_code=422, detail="The document could not be extracted.") from error
+            try:
+                storage.delete(storage_key)
+            except OSError:
+                pass
+        raise HTTPException(
+            status_code=422, detail="The document could not be extracted."
+        ) from error
 
     if not blocks:
         if storage_key:
@@ -595,8 +681,13 @@ def download_document(document_id: str, session: str | None = Cookie(default=Non
                FROM documents WHERE id = ?""",
             (user["id"], json.dumps({"document_id": document_id}), document_id),
         )
-    return Response(content=content, media_type="application/octet-stream",
-                    headers={"Content-Disposition": f'attachment; filename="{Path(row["filename"]).name}"'})
+    safe_filename = Path(row["filename"]).name
+    download_name = quote(safe_filename, safe="")
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{download_name}"},
+    )
 
 
 @app.get("/api/institutions/{institution_id}/documents")

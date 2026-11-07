@@ -1,10 +1,14 @@
 import unittest
+import zipfile
 from io import BytesIO
 
 import docx
 import fitz
 
-from app.document_processing import ExtractedBlock, extract_blocks, segment_blocks
+from app.document_processing import (
+    MAX_DOCX_COMPRESSION_RATIO, MAX_PDF_PAGES, ExtractedBlock,
+    extract_blocks, segment_blocks,
+)
 from app.retrieval import retrieve_matches
 
 
@@ -49,6 +53,50 @@ class DocumentProcessingTests(unittest.TestCase):
     def test_invalid_signature_is_rejected(self):
         with self.assertRaises(ValueError):
             extract_blocks("report.pdf", b"not a pdf")
+
+    def test_pdf_page_limit_is_enforced_before_extraction(self):
+        document = fitz.open()
+        for _ in range(MAX_PDF_PAGES + 1):
+            document.new_page()
+        with self.assertRaisesRegex(ValueError, "maximum page count"):
+            extract_blocks("too-many-pages.pdf", document.tobytes())
+
+    def test_docx_rejects_invalid_zip_and_missing_required_parts(self):
+        with self.assertRaisesRegex(ValueError, "valid ZIP archive"):
+            extract_blocks("broken.docx", b"PK\\x03\\x04not-a-zip")
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("[Content_Types].xml", "<Types/>")
+            archive.writestr("word/styles.xml", "<styles/>")
+        with self.assertRaisesRegex(ValueError, "missing required"):
+            extract_blocks("missing-document-part.docx", output.getvalue())
+
+    def test_docx_rejects_excessive_compression_ratio(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("[Content_Types].xml", "A" * 100_000)
+            archive.writestr("word/document.xml", "<document/>")
+        with self.assertRaisesRegex(ValueError, "compression ratio"):
+            extract_blocks("zip-bomb.docx", output.getvalue())
+
+    def test_docx_rejects_unsafe_archive_paths(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("[Content_Types].xml", "<Types/>")
+            archive.writestr("word/document.xml", "<document/>")
+            archive.writestr("../outside.xml", "unsafe")
+        with self.assertRaisesRegex(ValueError, "unsafe archive path"):
+            extract_blocks("unsafe.docx", output.getvalue())
+
+    def test_docx_rejects_windows_absolute_archive_paths(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("[Content_Types].xml", "<Types/>")
+            archive.writestr("word/document.xml", "<document/>")
+            archive.writestr("C:\\\\temp\\\\outside.xml", "unsafe")
+        with self.assertRaisesRegex(ValueError, "unsafe archive path"):
+            extract_blocks("windows-path.docx", output.getvalue())
+
 
     def test_segmentation_is_ordered_and_overlaps_long_text(self):
         block = ExtractedBlock("word " * 600, 2, "Evidence", None, None, "test")
