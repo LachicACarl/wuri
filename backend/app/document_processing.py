@@ -85,9 +85,10 @@ def _validate_docx_archive(content: bytes) -> None:
                 windows_path = PureWindowsPath(name)
                 if (
                     not name or name.startswith(("/", "\\\\"))
-                    or "\\\\" in name or path.is_absolute()
+                    or "\\" in name or path.is_absolute()
                     or windows_path.is_absolute() or windows_path.drive
                     or any(part in {"", ".", ".."} for part in path.parts)
+                    or any(part in {"", ".", ".."} for part in windows_path.parts)
                 ):
                     raise ValueError("DOCX package contains an unsafe archive path.")
                 if name in names:
