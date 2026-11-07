@@ -45,6 +45,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Apply semver-safe dependency audit fixes to lockfile
+        working-directory: university-ranking-dss
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
       - name: Install frontend dependencies
         working-directory: university-ranking-dss
         run: npm ci
@@ -53,6 +56,15 @@ jobs:
         run: |
           npm audit --json > npm-audit.json || true
           node -e 'const a = JSON.parse(require("fs").readFileSync("npm-audit.json", "utf8")); console.log("Totals:", JSON.stringify(a.metadata?.vulnerabilities ?? {})); for (const [name, item] of Object.entries(a.vulnerabilities ?? {})) console.log(name + ": " + JSON.stringify(item, null, 2));'
+      - name: Upload dependency remediation preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuri-dependency-remediation-preview
+          path: |
+            university-ranking-dss/package-lock.json
+            university-ranking-dss/npm-audit.json
+          retention-days: 1
       - name: Run ESLint
         working-directory: university-ranking-dss
         run: npm run lint
