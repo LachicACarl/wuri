@@ -90,3 +90,14 @@ non-executing methods; establish provenance, identify the loader's complete beha
 filesystem, process, credential, or persistence actions; examine relevant CI, workstation, account,
 and deployment evidence for possible prior execution; document evidence sources and limitations.
 Do not execute the file, install its dependencies, or use an online/deobfuscation service that runs it.
+
+
+## Execution-readiness handoff
+
+The current `university-ranking-dss/` tree is a hold-screen snapshot, not the earlier operational prototype. Do not describe it as an application with repairable login/upload/scoring flows: those flows are absent by design. The current source-level limitation is architectural incompleteness, not a diagnosed runtime defect.
+
+The package manifest declares four scripts (`dev`, `build`, `lint`, `preview`) but this review did not invoke them. No lockfile is tracked, so the dependency graph is not pinned. A future authorized validation must use an isolated disposable environment, review and pin exact dependency versions first, produce a lockfile through the approved package manager, inspect the resulting diff, and then run lint/build against the exact reviewed commit. Record tool versions, command, exit code, and log reference; do not infer success from a manifest or static source inspection.
+
+The current page is intentionally non-operational. Returning the UI to an active product requires a separately approved implementation plan for identity/session management, server-side authorization, private document intake, evidence extraction/provenance, approved scoring methodology, database design, API contracts, and automated tests. The proposal documents in this branch are not implementation authorization.
+
+**Do not create a lockfile, install packages, run scripts, or trigger CI as part of this static-only review.**
