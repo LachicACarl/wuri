@@ -311,113 +311,20 @@ const Login = () => (
   </div>
 )
 
-const Dashboard = ({ evaluation, history }) => {
-  if (!evaluation) {
-    return (
-      <section className="flex min-h-full items-center justify-center p-6">
-        <div className="max-w-xl text-center">
-          <div className="mx-auto mb-5 inline-flex rounded-lg bg-slate-900 p-4 text-white">
-            <CloudUpload size={36} />
-          </div>
-          <h2 className="text-3xl font-black tracking-normal text-slate-950">No assessment generated yet</h2>
-          <p className="mt-3 text-slate-500">Upload an institutional document to run document screening, top-K evidence retrieval, EQAM scoring, and readiness aggregation.</p>
-          <Link to="/upload" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
-            Start Assessment <ChevronRight size={18} />
-          </Link>
-        </div>
-      </section>
-    )
-  }
-
-  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
-  if (!hasValidatedResult) {
-    return (
-      <section className="space-y-6 p-6 lg:p-8">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-          <div className="flex items-center gap-2 font-black text-amber-900">
-            <AlertTriangle size={20} />
-            Assessment result unavailable
-          </div>
-          <p className="mt-2 text-sm text-amber-900">
-            No validated backend assessment is available. Local demonstration values are not used as institutional scores.
-            Connect an authorized assessment service and complete the approved validation process before reporting RRS or ARRS.
-          </p>
-          <Link to="/upload" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
-            Return to document upload <ChevronRight size={16} />
-          </Link>
-        </div>
-      </section>
-    )
-  }
-
-  const chartData = FRAMEWORKS.map((framework) => ({
-    framework: framework.name,
-    score: Number(evaluation.scores[framework.name]),
-    color: framework.color,
-  }))
-
-  return (
-    <section className="space-y-6 p-6 lg:p-8">
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
-        <div>
-          <p className="text-xs font-black uppercase text-slate-400">Verified institution</p>
-          <h2 className="mt-1 text-3xl font-black tracking-normal text-slate-950">{evaluation.school_name}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-500">Best-fit framework: <span className="font-bold text-slate-900">{evaluation.best_fit}</span></p>
-        </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-          ARRS {evaluation.arrs}/100
-        </div>
+const Dashboard = () => (
+  <section className="flex min-h-full items-center justify-center p-6">
+    <div className="max-w-xl text-center">
+      <div className="mx-auto mb-5 inline-flex rounded-lg bg-amber-100 p-4 text-amber-900">
+        <AlertTriangle size={36} />
       </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <StatCard label="Accepted Evidence Records" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
-        <StatCard label="Frameworks Included" value={FRAMEWORKS.length} icon={BarChart3} />
-        <StatCard label="Session Assessment Records" value={history.length} icon={History} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-black text-slate-950">Ranking Readiness Scores</h3>
-            <span className="text-xs font-bold text-slate-500">Backend-provided framework results</span>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="framework" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} />
-                <Tooltip />
-                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry) => <Cell key={entry.framework} fill={entry.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-lg font-black text-slate-950">Document Metadata</h3>
-          <dl className="grid grid-cols-1 gap-3 text-sm">
-            {[
-              ['Source', evaluation.metadata.source],
-              ['Document class', evaluation.metadata.sourceType],
-              ['Date', evaluation.metadata.date],
-              ['Extraction', evaluation.metadata.extractionStatus],
-              ['Verification', evaluation.metadata.verificationStatus],
-              ['Provenance', evaluation.metadata.provenance],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg bg-slate-50 p-3">
-                <dt className="text-xs font-black uppercase text-slate-400">{label}</dt>
-                <dd className="mt-1 font-semibold text-slate-800">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-    </section>
-  )
-}
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Assessment service not available</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        No assessment backend or scoring engine is connected. The dashboard will not
+        display placeholder scores, institution rankings, or generated evidence.
+      </p>
+    </div>
+  </section>
+)
 
 const DocumentUpload = () => (
   <section className="space-y-6 p-6 lg:p-8">
@@ -452,52 +359,22 @@ const DocumentUpload = () => (
   </section>
 )
 
-const EvidenceView = ({ evaluation }) => {
-  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
-  return (
+const EvidenceView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Semantic Evidence & EQAM</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Top-K evidence candidates are mapped to ranking indicators and scored across the five EQAM dimensions. Acceptance threshold tau = 0.70.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Evidence & EQAM — Not Available</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        Document extraction, semantic retrieval, evidence verification, and EQAM
+        calculation are not implemented or connected.
+      </p>
     </div>
-    {!hasValidatedResult ? (
-      <EmptyState text="Validated backend evidence is unavailable. No sample or metadata-derived evidence is displayed." />
-    ) : (
-      <div className="grid grid-cols-1 gap-4">
-        {evaluation.evidence.map((item) => (
-          <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">{item.id}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.framework}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.indicator}</span>
-                  <span className={`rounded px-2 py-1 text-xs font-bold ${item.accepted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{item.accepted ? 'Accepted' : 'Review'}</span>
-                </div>
-                <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{item.passage}</p>
-                <p className="mt-3 text-xs font-semibold text-slate-500">{item.source} | {item.date} | page {item.page} | {item.section} | split: {item.split}</p>
-              </div>
-              <div className="min-w-32 rounded-lg bg-slate-50 p-3 text-center">
-                <div className="text-xs font-black uppercase text-slate-400">AES</div>
-                <div className="text-2xl font-black text-slate-950">{item.aes}</div>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-5">
-              {EQAM_DIMENSIONS.map(([dimension, weight]) => (
-                <div key={dimension} className="rounded-lg bg-slate-50 p-3">
-                  <div className="text-xs font-black text-slate-500">{dimension}</div>
-                  <div className="mt-1 text-lg font-black text-slate-950">{item.dimensions[dimension]}</div>
-                  <div className="text-xs font-semibold text-slate-400">weight {weight}</div>
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-    )}
+    <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+      No source passages, page references, confidence values, AES values, or accepted
+      evidence records are available. This page will remain empty until the approved
+      extraction and provenance pipeline is implemented.
+    </div>
   </section>
-  )
-}
+)
 
 const FrameworkAnalysis = () => (
   <section className="space-y-6 p-6 lg:p-8">
@@ -546,35 +423,20 @@ const FrameworkAnalysis = () => (
   </section>
 )
 
-const ExplainableAI = ({ evaluation }) => {
-  const hasValidatedResult = isUsableBackendEvaluation(evaluation)
-  return (
+const ExplainableAI = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI & Decision Support</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Administrators can inspect score drivers, trace evidence, and identify readiness gaps by framework and criterion.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI — Not Available</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        No assessment result or explanation service is currently connected.
+      </p>
     </div>
-    {!hasValidatedResult ? (
-      <EmptyState text="Validated backend explanations are unavailable. No generated sample findings are displayed." />
-    ) : (
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-emerald-700"><CheckCircle2 size={20} /> Strengths</h3>
-          <ul className="space-y-3">
-            {evaluation.strengths.map((item) => <li key={item} className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-lg border border-amber-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-amber-700"><AlertTriangle size={20} /> Gaps</h3>
-          <ul className="space-y-3">
-            {evaluation.weaknesses.map((item) => <li key={item} className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
-          </ul>
-        </div>
-      </div>
-    )}
+    <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+      Strengths, weaknesses, score contributions, and recommendations will not be
+      fabricated. This view requires a validated assessment run and traceable evidence.
+    </div>
   </section>
-  )
-}
+)
 
 const ChecklistView = () => (
   <section className="space-y-6 p-6 lg:p-8">
@@ -699,47 +561,21 @@ const ValidationView = () => (
   </section>
 )
 
-const HistoryView = ({ history }) => {
-  const sorted = useMemo(() => [...history].sort((a, b) => b.arrs - a.arrs), [history])
-  return (
-    <section className="space-y-6 p-6 lg:p-8">
-      <div>
-        <h2 className="text-3xl font-black tracking-normal text-slate-950">Assessment Session History</h2>
-        <p className="mt-2 max-w-3xl text-sm text-slate-500">This session-only list contains validated backend responses received during the current browser session. It is not an official university ranking.</p>
-      </div>
-      {sorted.length === 0 ? <EmptyState text="No assessment history yet." /> : (
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
-                <tr>
-                  <th className="p-4">Rank</th>
-                  <th className="p-4">Institution</th>
-                  <th className="p-4">Document Source</th>
-                  <th className="p-4">Best-Fit Framework</th>
-                  <th className="p-4">Timestamp</th>
-                  <th className="p-4 text-right">ARRS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {sorted.map((item, index) => (
-                  <tr key={`${item.filename}-${item.timestamp}`}>
-                    <td className="p-4 font-black text-slate-950">#{index + 1}</td>
-                    <td className="p-4 font-bold text-slate-800">{item.schoolName}</td>
-                    <td className="p-4 text-slate-500">{item.filename}</td>
-                    <td className="p-4 text-slate-600">{item.bestFit}</td>
-                    <td className="p-4 text-slate-500">{item.timestamp}</td>
-                    <td className="p-4 text-right font-black text-slate-950">{item.arrs}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
+const HistoryView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Assessment History — Not Available</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        Persistent assessment history is not implemented because there is no approved
+        backend or database integration.
+      </p>
+    </div>
+    <div role="status" className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+      No assessment records are stored or displayed. This page will be enabled only
+      after authenticated, institution-scoped persistence and audit logging are verified.
+    </div>
+  </section>
+)
 
 const EmptyState = ({ text }) => (
   <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm font-semibold text-slate-500 shadow-sm">{text}</div>
