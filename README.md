@@ -10,7 +10,7 @@ This repository currently contains a quarantined React/Vite frontend snapshot in
 - Dependencies: `university-ranking-dss/package.json`
 - Dependency lockfile: intentionally excluded from this quarantine snapshot pending dependency provenance review
 
-Install/build/test commands are intentionally not documented as approved execution steps while the repository security hold is active.
+The manifest contains development/build/lint/preview scripts, but these are not approved execution steps while the security hold is active. The current frontend is deliberately non-operational; do not start it or treat the scripts as evidence that the full system is ready.
 
 ## Current security and integrity status
 
