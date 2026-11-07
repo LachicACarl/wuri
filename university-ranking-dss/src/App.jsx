@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
-import { Navigate, Route, Routes, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, Route, Routes, Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
   Award,
   BarChart3,
+  Building2,
   BookOpenCheck,
   Brain,
   CheckCircle2,
@@ -12,7 +13,7 @@ import {
   CloudUpload,
   Database,
   FileSearch,
-  History,
+  FileText,
   KeyRound,
   LayoutDashboard,
   Lightbulb,
@@ -29,72 +30,13 @@ import {
   User,
   X,
 } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-const FRAMEWORKS = [
-  {
-    name: 'WURI',
-    color: '#d97706',
-    focus: 'Innovation, entrepreneurship, social responsibility, crisis management, and student mobility.',
-    officialWeight: 0.25,
-    indicators: [
-      ['Innovation', 0.32],
-      ['Industrial Application', 0.22],
-      ['Student Mobility', 0.16],
-      ['Social Responsibility', 0.18],
-      ['Crisis Management', 0.12],
-    ],
-  },
-  {
-    name: 'THE',
-    color: '#2563eb',
-    focus: 'Teaching, research environment, research quality, industry engagement, and international outlook.',
-    officialWeight: 0.25,
-    indicators: [
-      ['Teaching', 0.29],
-      ['Research Environment', 0.29],
-      ['Research Quality', 0.30],
-      ['Industry', 0.04],
-      ['International Outlook', 0.08],
-    ],
-  },
-  {
-    name: 'QS',
-    color: '#7c3aed',
-    focus: 'Academic reputation, employer reputation, faculty-student ratio, citations, and internationalization.',
-    officialWeight: 0.25,
-    indicators: [
-      ['Academic Reputation', 0.30],
-      ['Employer Reputation', 0.15],
-      ['Faculty Student Ratio', 0.10],
-      ['Citations', 0.20],
-      ['International Network', 0.10],
-      ['Sustainability', 0.15],
-    ],
-  },
-  {
-    name: 'UI GreenMetric',
-    color: '#059669',
-    focus: 'Setting, energy, waste, water, transportation, education, and sustainable campus operations.',
-    officialWeight: 0.25,
-    indicators: [
-      ['Setting Infrastructure', 0.15],
-      ['Energy Climate', 0.21],
-      ['Waste', 0.18],
-      ['Water', 0.10],
-      ['Transportation', 0.18],
-      ['Education Research', 0.18],
-    ],
-  },
-]
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 
-const EQAM_DIMENSIONS = [
-  ['Semantic Relevance', 0.30],
-  ['Model Confidence', 0.20],
-  ['Evidence Completeness', 0.20],
-  ['Source Reliability', 0.15],
-  ['Evidence Strength', 0.15],
-]
+const apiFetch = (path, options = {}) => fetch(`${API_BASE_URL}${path}`, {
+  ...options,
+  credentials: 'include',
+})
 
 const DOCUMENT_TYPES = [
   'Strategic plan',
@@ -131,26 +73,17 @@ const SOP_ALIGNMENT_ROWS = [
 ]
 
 const ARCHITECTURE_MODULES = [
-  ['Institutional Document Management', 'Collection, screening, verification, text extraction, segmentation, and metadata tracking'],
-  ['Evidence Extraction & Knowledge Base', 'Enhanced SBERT embeddings, top-K retrieval, framework indicator mapping, and RBAC-protected evidence records'],
-  ['Readiness Assessment Engine', 'EQAM, AES thresholding, framework-constrained AHP, fixed-reference TOPSIS, RRS, ARRS, and best-fit logic'],
-  ['XAI & Recommendation Module', 'Evidence traceability, criterion contributions, gap identification, recommendations, and close-alternative explanations'],
-  ['Dashboard & Reporting Module', 'Readiness dashboards, school ranking history, validation outputs, report-ready tables, and QA artifacts'],
+  ['Institutional Document Management', 'Authenticated upload, malware scan gates, text extraction, segmentation, and metadata storage; institutional authorization still requires review.'],
+  ['Evidence Extraction & Retrieval', 'Extracted passages are persisted; optional local-model matches are retrieval candidates, not verified evidence.'],
+  ['Readiness Assessment', 'EQAM, AHP, and TOPSIS helpers exist, but no end-to-end readiness calculation is connected to upload.'],
+  ['XAI & Recommendations', 'Score explanations and recommendations are unavailable because no readiness score is generated.'],
+  ['Dashboard & Reporting', 'Institution and research status views are available; assessment history lists workflow records without scores or rankings.'],
 ]
 
 const GOVERNANCE_ROWS = [
-  ['Administrator', 'Manage users, institutional knowledge base, framework criteria, document records, and validation artifacts'],
-  ['Evaluator', 'Review extracted evidence, EQAM dimensions, indicator mappings, and expert-validation cases'],
-  ['Viewer', 'Read dashboards, reports, XAI explanations, and approved assessment history'],
-]
-
-const samplePassages = [
-  'The university expanded industry-linked innovation hubs, startup incubation, and student enterprise grants across all colleges.',
-  'Research productivity increased through indexed publications, citation mentoring, faculty profiles, and externally funded projects.',
-  'Campus sustainability reports document renewable energy use, water conservation, waste segregation, and low-emission transport.',
-  'Internationalization policies support exchange programs, visiting professors, global partnerships, and mobility scholarships.',
-  'Extension programs demonstrate measurable community outcomes through livelihood, health, education, and disaster response initiatives.',
-  'The strategic plan establishes quality assurance, accreditation readiness, data governance, and evidence-based institutional planning.',
+  ['Administrator', 'Manage authorized institution records, document metadata, and research-validation workflows'],
+  ['Evaluator', 'Review evidence metadata, indicator mappings, and expert-validation cases'],
+  ['Viewer', 'Read permitted institution and workflow status records; ranking reports are unavailable'],
 ]
 
 const checklistGroups = [
@@ -176,169 +109,46 @@ const checklistGroups = [
     title: 'Evidence Quality Assessment Mechanism',
     icon: ShieldCheck,
     items: [
-      ['Five EQAM dimensions', 'Semantic relevance, model confidence, completeness, source reliability, and evidence strength are scored.'],
-      ['Adjusted Evidence Score', 'AES uses weighted dimensions and an acceptance threshold tau = 0.70.'],
+      ['Five EQAM dimensions', 'Chapter 3 specifies these dimensions; the upload workflow does not calculate them.'],
+      ['Adjusted Evidence Score', 'EQAM/AES helper code is provisional and is not connected to upload or a verified acceptance threshold.'],
     ],
   },
   {
     title: 'MCDA',
     icon: SlidersHorizontal,
     items: [
-      ['Framework-constrained AHP', 'Published framework weights are fixed while operational subcriteria use AHP consistency checks with CR <= 0.10.'],
-      ['Fixed-reference TOPSIS', 'Readiness is evaluated against fixed ideal = 1 and anti-ideal = 0 anchors.'],
+      ['Framework-constrained AHP', 'AHP utilities exist; framework criteria and weights remain unverified and no institutional assessment invokes them.'],
+      ['Fixed-reference TOPSIS', 'A TOPSIS helper exists, but the approved evidence-to-criterion aggregation rule is missing.'],
     ],
   },
   {
     title: 'Scoring & Aggregation',
     icon: Target,
     items: [
-      ['RRS', 'Framework-specific Ranking Readiness Scores are computed on a 0-100 scale.'],
-      ['ARRS', 'Aggregated Ranking Readiness Score uses equal framework weighting.'],
-      ['Best-fit rule', 'The maximum RRS is selected unless close alternatives fall within the 5 percentage-point margin rule.'],
+      ['RRS', 'A calculation helper exists; no institution RRS is produced or persisted.'],
+      ['ARRS', 'An aggregation helper exists; no institution ARRS is produced or persisted.'],
+      ['Best-fit rule', 'A selection helper exists; no Best-Fit recommendation is generated for uploaded evidence.'],
     ],
   },
   {
     title: 'XAI & Decision Support',
     icon: Lightbulb,
     items: [
-      ['Traceability', 'Scores link back to source passages, page or section metadata, and accepted evidence status.'],
-      ['Gap analysis', 'Criterion readiness and weak evidence dimensions are shown for administrators.'],
-      ['Dashboards and reports', 'Dashboard, ranking, XAI, framework, and validation views support planning decisions.'],
+      ['Traceability', 'Passages retain extraction metadata; source authorization and research permission remain unverified after upload.'],
+      ['Gap analysis', 'Criterion readiness and EQAM gaps are unavailable without an implemented assessment.'],
+      ['Dashboards and reports', 'The dashboard reports institutions and gate status; it does not provide rankings or score reports.'],
     ],
   },
   {
     title: 'Validation, Testing & QA',
     icon: ClipboardCheck,
     items: [
-      ['Baselines and ablation', 'Validation plan includes baseline and component-removal comparisons.'],
-      ['Agreement statistics', "Fleiss' kappa and ICC are included for expert validation."],
-      ['Robustness and ISO quality', 'Sensitivity checks and ISO/IEC 25010 functionality, usability, and security scope are documented.'],
+      ['Baselines and ablation', 'A0 retrieval evaluation is separate from the incomplete AHP-TOPSIS baseline; A1-A4 are not implemented.'],
+      ['Agreement statistics', "Some agreement helpers exist; ICC model approval and all empirical expert judgments remain outstanding."],
+      ['Robustness and ISO quality', 'These are planned evaluations; no evaluator responses or empirical results are available.'],
     ],
   },
 ]
-
-function clamp(value, min = 0, max = 1) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function hashText(text) {
-  return [...text].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)
-}
-
-function scoreFromSeed(seed, offset = 0, floor = 0.52, span = 0.43) {
-  const wave = Math.abs(Math.sin(seed * 0.017 + offset) * 10000)
-  return Number((floor + (wave % 1000) / 1000 * span).toFixed(3))
-}
-
-function classifyDocument(fileName) {
-  const name = fileName.toLowerCase()
-  if (name.includes('sustain')) return 'Sustainability report'
-  if (name.includes('research') || name.includes('publication')) return 'Research publication'
-  if (name.includes('faculty')) return 'Faculty profile'
-  if (name.includes('extension')) return 'Extension report'
-  if (name.includes('policy')) return 'Institutional policy'
-  if (name.includes('accredit')) return 'Accreditation report'
-  if (name.includes('annual') || name.includes('accomplishment')) return 'Annual/accomplishment report'
-  return 'Strategic plan'
-}
-
-function detectSchoolName(fileName) {
-  const base = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
-  const cleaned = base.replace(/\b(strategic|plan|annual|report|accreditation|research|sustainability|extension|policy|faculty|profile|202\d)\b/gi, '').trim()
-  return cleaned.length > 4 ? cleaned.replace(/\s+/g, ' ') : 'Verified Institution'
-}
-
-function buildLocalEvaluation(file) {
-  const seed = hashText(`${file.name}-${file.size}-${file.type}-${file.lastModified}`)
-  const sourceType = classifyDocument(file.name)
-  const datasetSplits = { training: 70, validation: 15, test: 15 }
-
-  const evidence = samplePassages.map((passage, index) => {
-    const framework = FRAMEWORKS[index % FRAMEWORKS.length]
-    const indicator = framework.indicators[index % framework.indicators.length][0]
-    const dimensions = Object.fromEntries(
-      EQAM_DIMENSIONS.map(([dimension], dimensionIndex) => [dimension, scoreFromSeed(seed, index + dimensionIndex * 0.41)])
-    )
-    const aes = EQAM_DIMENSIONS.reduce((sum, [dimension, weight]) => sum + dimensions[dimension] * weight, 0)
-    return {
-      id: `EV-${String(index + 1).padStart(3, '0')}`,
-      passage,
-      framework: framework.name,
-      indicator,
-      source: file.name,
-      sourceType,
-      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
-      page: index + 1,
-      section: `${sourceType} / Section ${index + 1}`,
-      split: index < 4 ? 'training' : index === 4 ? 'validation' : 'test',
-      dimensions,
-      aes: Number(aes.toFixed(3)),
-      accepted: aes >= 0.70,
-    }
-  }).sort((a, b) => b.aes - a.aes)
-
-  const topK = evidence.slice(0, 5)
-  const frameworkScores = Object.fromEntries(
-    FRAMEWORKS.map((framework, index) => {
-      const frameworkEvidence = topK.filter((item) => item.framework === framework.name)
-      const evidenceFactor = frameworkEvidence.length
-        ? frameworkEvidence.reduce((sum, item) => sum + item.aes, 0) / frameworkEvidence.length
-        : scoreFromSeed(seed, index + 2.4, 0.50, 0.28)
-      const indicatorFactor = framework.indicators.reduce((sum, [, weight], indicatorIndex) => {
-        return sum + scoreFromSeed(seed, index + indicatorIndex * 0.33, 0.48, 0.47) * weight
-      }, 0)
-      const fixedReferenceTopsis = clamp((evidenceFactor * 0.58 + indicatorFactor * 0.42 - 0) / (1 - 0))
-      return [framework.name, Math.round(fixedReferenceTopsis * 100)]
-    })
-  )
-
-  const arrs = Math.round(Object.values(frameworkScores).reduce((sum, score) => sum + score, 0) / FRAMEWORKS.length)
-  const sorted = Object.entries(frameworkScores).sort((a, b) => b[1] - a[1])
-  const closeAlternatives = sorted.filter(([, score]) => sorted[0][1] - score <= 5).map(([name]) => name)
-  const bestFit = closeAlternatives.length > 1 ? `${sorted[0][0]} with close alternatives: ${closeAlternatives.slice(1).join(', ')}` : sorted[0][0]
-
-  const subScores = Object.fromEntries(
-    FRAMEWORKS.map((framework, frameworkIndex) => [
-      framework.name,
-      Object.fromEntries(
-        framework.indicators.map(([indicator, weight], indicatorIndex) => [
-          indicator,
-          Math.round(scoreFromSeed(seed, frameworkIndex + indicatorIndex * 0.29, 0.45, 0.50) * weight * 100),
-        ])
-      ),
-    ])
-  )
-
-  const strengths = topK.slice(0, 3).map((item) => `${item.indicator} has accepted evidence from ${item.sourceType} (${item.id}, AES ${item.aes}).`)
-  const weaknesses = evidence
-    .slice(-3)
-    .map((item) => `${item.indicator} needs stronger documentation; ${item.id} is ${item.accepted ? 'accepted but comparatively weak' : 'below tau = 0.70'}.`)
-
-  return {
-    filename: file.name,
-    school_name: detectSchoolName(file.name),
-    scores: frameworkScores,
-    sub_scores: subScores,
-    arrs,
-    best_fit: bestFit,
-    strengths,
-    weaknesses,
-    evidence: topK,
-    metadata: {
-      source: file.name,
-      sourceType,
-      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
-      fileSize: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-      extractionStatus: file.name.toLowerCase().endsWith('.txt') ? 'Text extracted in browser' : 'Screened; backend extraction expected for full PDF/DOCX text',
-      verificationStatus: 'Verified by filename and document screening metadata',
-      datasetSplits,
-      roleAccess: ['Administrator: manage KB', 'Evaluator: score evidence', 'Viewer: read dashboards'],
-      ahpConsistencyRatio: Number(scoreFromSeed(seed, 7, 0.03, 0.065).toFixed(3)),
-      topsisAnchors: 'ideal = 1, anti-ideal = 0',
-      tau: 0.70,
-    },
-  }
-}
 
 const NavLink = ({ to, icon: Icon, children, onClick }) => {
   const location = useLocation()
@@ -357,30 +167,31 @@ const NavLink = ({ to, icon: Icon, children, onClick }) => {
   )
 }
 
-const StatCard = ({ label, value, icon: Icon }) => (
-  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="mb-4 inline-flex rounded-lg bg-slate-50 p-2 text-slate-700">
-      <Icon size={20} />
-    </div>
-    <div className="text-2xl font-black text-slate-950">{value}</div>
-    <div className="mt-1 text-sm font-medium text-slate-500">{label}</div>
-  </div>
-)
-
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleLoginSubmit = (event) => {
+  const handleLoginSubmit = async (event) => {
     event.preventDefault()
-    if (username === 'admin' && password === 'admin123') {
+    setError('')
+    try {
+      const response = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Invalid credentials')
+      }
       onLogin(true)
       navigate('/')
-      return
+    } catch {
+      setError('Authentication failed. Start the backend and use an authorized account.')
     }
-    setError('Invalid username or password. Try admin / admin123.')
   }
 
   return (
@@ -418,92 +229,101 @@ const Login = ({ onLogin }) => {
   )
 }
 
-const Dashboard = ({ evaluation, history }) => {
-  if (!evaluation) {
-    return (
-      <section className="flex min-h-full items-center justify-center p-6">
-        <div className="max-w-xl text-center">
-          <div className="mx-auto mb-5 inline-flex rounded-lg bg-slate-900 p-4 text-white">
-            <CloudUpload size={36} />
-          </div>
-          <h2 className="text-3xl font-black tracking-normal text-slate-950">No assessment generated yet</h2>
-          <p className="mt-3 text-slate-500">Upload an institutional document to run document screening, top-K evidence retrieval, EQAM scoring, and readiness aggregation.</p>
-          <Link to="/upload" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
-            Start Assessment <ChevronRight size={18} />
-          </Link>
-        </div>
-      </section>
-    )
-  }
+const PersistedDashboard = () => {
+  const navigate = useNavigate()
+  const [institutions, setInstitutions] = useState([])
+  const [status, setStatus] = useState('Loading institutions...')
 
-  const chartData = FRAMEWORKS.map((framework) => ({
-    framework: framework.name,
-    score: evaluation.scores[framework.name],
-    color: framework.color,
-  }))
+  useEffect(() => {
+    let active = true
+    apiFetch('/api/institutions')
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load permitted institutions.')
+        return response.json()
+      })
+      .then((data) => {
+        if (active) {
+          setInstitutions(data.institutions || [])
+          setStatus('')
+        }
+      })
+      .catch((error) => {
+        if (active) setStatus(error.message || 'Unable to load permitted institutions.')
+      })
+    return () => { active = false }
+  }, [])
 
   return (
     <section className="space-y-6 p-6 lg:p-8">
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs font-black uppercase text-slate-400">Verified institution</p>
-          <h2 className="mt-1 text-3xl font-black tracking-normal text-slate-950">{evaluation.school_name}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-500">Best-fit framework: <span className="font-bold text-slate-900">{evaluation.best_fit}</span></p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Institution workspace</p>
+          <h1 className="mt-1 text-3xl font-black text-slate-950">Readiness Dashboard</h1>
+          <p className="mt-2 text-sm text-slate-500">Review persisted institutions and authorized evidence readiness.</p>
         </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-          ARRS {evaluation.arrs}/100
+        <div className="flex gap-3">
+          <button type="button" onClick={() => navigate('/institutions')} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">
+            Manage institutions
+          </button>
+          <button type="button" onClick={() => navigate('/upload')} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-slate-800">
+            Upload evidence
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Accepted Top-K Evidence" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
-        <StatCard label="AHP Consistency Ratio" value={evaluation.metadata.ahpConsistencyRatio <= 0.1 ? `CR ${evaluation.metadata.ahpConsistencyRatio}` : 'Review CR'} icon={Network} />
-        <StatCard label="Frameworks Scored" value="4" icon={BarChart3} />
-        <StatCard label="Assessment Records" value={history.length} icon={History} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-black text-slate-950">Ranking Readiness Scores</h3>
-            <span className="text-xs font-bold text-slate-500">Fixed-reference TOPSIS anchors: {evaluation.metadata.topsisAnchors}</span>
+      {status ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">{status}</div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400">Permitted institutions</p>
+              <p className="mt-2 text-3xl font-black text-slate-950">{institutions.length}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400">Persisted workspace</p>
+              <p className="mt-2 text-sm font-bold text-emerald-700">Connected to backend</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400">Scoring state</p>
+              <p className="mt-2 text-sm font-bold text-amber-700">Research-gated; no ranking score</p>
+            </div>
           </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="framework" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} />
-                <Tooltip />
-                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry) => <Cell key={entry.framework} fill={entry.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-lg font-black text-slate-950">Document Metadata</h3>
-          <dl className="grid grid-cols-1 gap-3 text-sm">
-            {[
-              ['Source', evaluation.metadata.source],
-              ['Document class', evaluation.metadata.sourceType],
-              ['Date', evaluation.metadata.date],
-              ['Size', evaluation.metadata.fileSize],
-              ['Extraction', evaluation.metadata.extractionStatus],
-              ['Verification', evaluation.metadata.verificationStatus],
-              ['Dataset split', `${evaluation.metadata.datasetSplits.training}/${evaluation.metadata.datasetSplits.validation}/${evaluation.metadata.datasetSplits.test}`],
-              ['Access roles', evaluation.metadata.roleAccess.join('; ')],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg bg-slate-50 p-3">
-                <dt className="text-xs font-black uppercase text-slate-400">{label}</dt>
-                <dd className="mt-1 font-semibold text-slate-800">{value}</dd>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <h2 className="text-xl font-black text-slate-950">Permitted institutions</h2>
+              <p className="mt-1 text-sm text-slate-500">Only institutions returned by the authenticated backend session appear here.</p>
+            </div>
+            {institutions.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <p className="font-bold text-slate-700">No institutions are available.</p>
+                <p className="mt-1 text-sm text-slate-500">Create an authorized institution registry record to begin.</p>
               </div>
-            ))}
-          </dl>
-        </div>
-      </div>
+            ) : (
+              <div className="grid gap-4 p-6 md:grid-cols-2">
+                {institutions.map((institution) => (
+                  <button
+                    type="button"
+                    key={institution.id}
+                    onClick={() => navigate('/institutions')}
+                    className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="font-black text-slate-950">{institution.display_name || institution.name}</h3>
+                        <p className="mt-1 text-sm text-slate-500">{institution.region || institution.country || 'Location not recorded'}</p>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{institution.role}</span>
+                    </div>
+                    <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">Open institution registry</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -511,31 +331,55 @@ const Dashboard = ({ evaluation, history }) => {
 const DocumentUpload = ({ onEvaluation }) => {
   const [status, setStatus] = useState('')
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0])
+  const [institutions, setInstitutions] = useState([])
+  const [frameworks, setFrameworks] = useState([])
+  const [institutionId, setInstitutionId] = useState('')
+  const [frameworkId, setFrameworkId] = useState('')
+  const [criterionId, setCriterionId] = useState('')
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/api/institutions').then((response) => response.json()),
+      apiFetch('/api/frameworks').then((response) => response.json()),
+    ]).then(([institutionData, frameworkData]) => {
+      setInstitutions(institutionData.institutions || [])
+      setFrameworks(frameworkData.frameworks || [])
+      if (institutionData.institutions?.[0]) setInstitutionId(institutionData.institutions[0].id)
+      if (frameworkData.frameworks?.[0]) setFrameworkId(frameworkData.frameworks[0].framework_id)
+    }).catch((error) => setStatus(error.message))
+  }, [])
+
+  const selectedFramework = frameworks.find((item) => item.framework_id === frameworkId)
+  const criteria = Object.keys(selectedFramework?.criteria || {})
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setStatus('Screening document and attempting backend semantic evaluation...')
+    setStatus('Uploading document for server-side processing...')
 
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('document_type', documentType)
+    const params = new URLSearchParams({
+      institution_id: institutionId,
+      framework_id: frameworkId,
+      framework_edition: selectedFramework?.methodology_version || '',
+      criterion_id: criterionId,
+      title: file.name,
+    })
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/upload', { method: 'POST', body: formData })
+      const response = await apiFetch(`/api/upload?${params.toString()}`, { method: 'POST', body: formData })
       if (response.ok) {
         const data = await response.json()
-        onEvaluation({ ...buildLocalEvaluation(file), ...data })
-        setStatus(`Backend evaluation complete for ${data.school_name || file.name}.`)
+        onEvaluation(data)
+        setStatus(`Document processing complete for ${file.name}. Readiness scoring is not implemented.`)
         return
       }
-      throw new Error('Backend returned an error')
-    } catch {
-      const localEvaluation = buildLocalEvaluation(file)
-      localEvaluation.metadata.sourceType = documentType
-      onEvaluation(localEvaluation)
-      setStatus('Backend unavailable. Generated a local checklist-aligned prototype evaluation from document metadata.')
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.detail || data.message || 'Backend returned an error')
+    } catch (error) {
+      setStatus(`Assessment unavailable: ${error.message}. No readiness score was generated.`)
     }
   }
 
@@ -549,6 +393,19 @@ const DocumentUpload = ({ onEvaluation }) => {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-4 text-lg font-black text-slate-950">Document Collection Coverage</h3>
+          <div className="mb-4 space-y-3">
+            <select value={institutionId} onChange={(event) => setInstitutionId(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="">Select institution</option>
+              {institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.display_name || institution.name}</option>)}
+            </select>
+            <select value={frameworkId} onChange={(event) => { setFrameworkId(event.target.value); setCriterionId('') }} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {frameworks.map((framework) => <option key={framework.framework_id} value={framework.framework_id}>{framework.framework_id} {framework.methodology_version}</option>)}
+            </select>
+            <select value={criterionId} onChange={(event) => setCriterionId(event.target.value)} required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="">Select criterion mapping</option>
+              {criteria.map((criterion) => <option key={criterion} value={criterion}>{criterion}</option>)}
+            </select>
+          </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {DOCUMENT_TYPES.map((type) => (
               <button
@@ -584,95 +441,295 @@ const DocumentUpload = ({ onEvaluation }) => {
 const EvidenceView = ({ evaluation }) => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Semantic Evidence & EQAM</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Top-K evidence candidates are mapped to ranking indicators and scored across the five EQAM dimensions. Acceptance threshold tau = 0.70.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Extracted Evidence & Retrieval Candidates</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Extracted passages and indicator matches are review candidates only. EQAM scoring and readiness assessment are unavailable.</p>
     </div>
     {!evaluation ? (
       <EmptyState text="Upload a document to view retrieved evidence." />
     ) : (
-      <div className="grid grid-cols-1 gap-4">
-        {evaluation.evidence.map((item) => (
-          <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="space-y-5">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-black text-slate-950">{evaluation.document?.filename}</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {evaluation.passages?.length || 0} extracted passage(s) · processing: {evaluation.processing_status}
+              </p>
+            </div>
+            <span className="rounded bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+              Assessment state: {evaluation.assessment_status?.state || evaluation.readiness_assessment_status || 'unavailable'}
+            </span>
+          </div>
+          <p className="mt-3 text-sm font-semibold text-amber-800">
+            Institutional authorization and source provenance remain unverified. Retrieved matches are candidates only; no readiness score was generated.
+          </p>
+          {evaluation.assessment_status?.reason && (
+            <p className="mt-2 text-sm text-slate-600">Scoring prerequisite: {evaluation.assessment_status.reason}</p>
+          )}
+          {evaluation.warnings?.map((warning) => (
+            <div key={warning} className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{warning}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+        {(evaluation.passages || []).map((item) => (
+          <article key={item.passage_id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">{item.id}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.framework}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.indicator}</span>
-                  <span className={`rounded px-2 py-1 text-xs font-bold ${item.accepted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{item.accepted ? 'Accepted' : 'Review'}</span>
+                  <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">{item.passage_id}</span>
+                  {item.page_number && <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">Page {item.page_number}</span>}
+                  {item.section_title && <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.section_title}</span>}
                 </div>
-                <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{item.passage}</p>
-                <p className="mt-3 text-xs font-semibold text-slate-500">{item.source} | {item.date} | page {item.page} | {item.section} | split: {item.split}</p>
+                <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{item.text}</p>
+                <p className="mt-3 text-xs font-semibold text-slate-500">{item.extraction_method} · offset {item.start_offset ?? 'n/a'}–{item.end_offset ?? 'n/a'}</p>
               </div>
-              <div className="min-w-32 rounded-lg bg-slate-50 p-3 text-center">
-                <div className="text-xs font-black uppercase text-slate-400">AES</div>
-                <div className="text-2xl font-black text-slate-950">{item.aes}</div>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-5">
-              {EQAM_DIMENSIONS.map(([dimension, weight]) => (
-                <div key={dimension} className="rounded-lg bg-slate-50 p-3">
-                  <div className="text-xs font-black text-slate-500">{dimension}</div>
-                  <div className="mt-1 text-lg font-black text-slate-950">{item.dimensions[dimension]}</div>
-                  <div className="text-xs font-semibold text-slate-400">weight {weight}</div>
-                </div>
-              ))}
             </div>
           </article>
         ))}
+        </div>
+        {evaluation.matches?.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-slate-950">Candidate indicator matches</h3>
+            <div className="mt-4 space-y-2">
+              {evaluation.matches.map((match) => (
+                <div key={`${match.passage_id}-${match.framework}-${match.indicator}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 text-sm">
+                  <span className="font-bold text-slate-800">{match.framework} · {match.indicator}</span>
+                  <span className="font-black text-slate-700">cosine similarity {match.similarity}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     )}
   </section>
 )
 
-const FrameworkAnalysis = ({ evaluation }) => (
-  <section className="space-y-6 p-6 lg:p-8">
-    <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework-Constrained AHP & TOPSIS</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Official framework weights remain fixed. Operational indicators are checked by AHP consistency and readiness is computed against fixed ideal and anti-ideal references.</p>
-    </div>
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-      {FRAMEWORKS.map((framework) => (
-        <div key={framework.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-black text-slate-950">{framework.name}</h3>
-              <p className="mt-1 text-sm text-slate-500">{framework.focus}</p>
-            </div>
-            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">fixed {Math.round(framework.officialWeight * 100)}%</span>
+const InstitutionRegistry = () => {
+  const [institutions, setInstitutions] = useState([])
+  const [frameworks, setFrameworks] = useState([])
+  const [selectedInstitution, setSelectedInstitution] = useState('')
+  const [selectedFramework, setSelectedFramework] = useState('')
+  const [selectedCriterion, setSelectedCriterion] = useState('')
+  const [evidenceStatus, setEvidenceStatus] = useState(null)
+  const [readiness, setReadiness] = useState([])
+  const [documents, setDocuments] = useState([])
+  const [name, setName] = useState('')
+  const [status, setStatus] = useState('')
+
+  const loadInstitutions = useCallback(async () => {
+    const response = await apiFetch('/api/institutions')
+    if (!response.ok) throw new Error('Institution registry is unavailable.')
+    const data = await response.json()
+    setInstitutions(data.institutions || [])
+    if (!selectedInstitution && data.institutions?.[0]) setSelectedInstitution(data.institutions[0].id)
+  }, [selectedInstitution])
+
+  useEffect(() => {
+    apiFetch('/api/institutions')
+      .then((response) => {
+        if (!response.ok) throw new Error('Institution registry is unavailable.')
+        return response.json()
+      })
+      .then((data) => {
+        setInstitutions(data.institutions || [])
+        if (data.institutions?.[0]) setSelectedInstitution(data.institutions[0].id)
+        return apiFetch('/api/frameworks')
+      })
+      .then((response) => response.json())
+      .then((frameworkData) => {
+        setFrameworks(frameworkData.frameworks || [])
+        if (frameworkData.frameworks?.[0]) setSelectedFramework(frameworkData.frameworks[0].framework_id)
+      })
+      .catch((error) => setStatus(error.message))
+  }, [])
+
+  useEffect(() => {
+    const framework = frameworks.find((item) => item.framework_id === selectedFramework)
+    if (!selectedInstitution || !framework) return
+    Promise.all([
+      apiFetch(`/api/institutions/${selectedInstitution}/readiness?framework_id=${encodeURIComponent(selectedFramework)}&framework_edition=${encodeURIComponent(framework.methodology_version)}`).then((response) => response.json()),
+      apiFetch(`/api/institutions/${selectedInstitution}/documents`).then((response) => response.json()),
+    ]).then(([readinessData, documentData]) => {
+      setReadiness(readinessData.records || [])
+      setDocuments(documentData.documents || [])
+    })
+      .catch((error) => setStatus(error.message))
+  }, [frameworks, selectedFramework, selectedInstitution])
+
+  const createInstitution = async (event) => {
+    event.preventDefault()
+    setStatus('')
+    const response = await apiFetch('/api/institutions', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setStatus(data.detail || 'Institution could not be created.')
+      return
+    }
+    setName('')
+    setStatus('Institution created. No ranking score was generated.')
+    await loadInstitutions()
+  }
+
+  const framework = frameworks.find((item) => item.framework_id === selectedFramework)
+  const readinessByCriterion = new Map(readiness.map((item) => [item.criterion_id, item]))
+  const criteria = Object.keys(framework?.criteria || {})
+  const activeCriterion = criteria.includes(selectedCriterion) ? selectedCriterion : criteria[0]
+  const currentEvidenceStatus = evidenceStatus || readinessByCriterion.get(activeCriterion)?.evidence_status || 'unknown'
+
+  const saveReadiness = async (event) => {
+    event.preventDefault()
+    const item = readinessByCriterion.get(activeCriterion)
+    const response = await apiFetch(`/api/institutions/${selectedInstitution}/readiness`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        framework_id: selectedFramework,
+        framework_edition: framework.methodology_version,
+        criterion_id: activeCriterion,
+        ...(item || {}),
+        evidence_status: currentEvidenceStatus,
+      }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setStatus(data.detail || 'Readiness metadata could not be saved.')
+      return
+    }
+    setStatus('Readiness metadata saved. No ranking score was generated.')
+    const refreshed = await apiFetch(`/api/institutions/${selectedInstitution}/readiness?framework_id=${encodeURIComponent(selectedFramework)}&framework_edition=${encodeURIComponent(framework.methodology_version)}`)
+    setReadiness((await refreshed.json()).records || [])
+  }
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black text-slate-950">Institution Registry & Evidence Readiness</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Manage authorized institution records and evidence metadata. This checklist does not calculate RRS, ARRS, or official rankings.</p>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-black text-slate-950">Institutions</h3>
+          <select value={selectedInstitution} onChange={(event) => setSelectedInstitution(event.target.value)} className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Select an institution</option>
+            {institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.display_name || institution.name}</option>)}
+          </select>
+          <form onSubmit={createInstitution} className="mt-6 space-y-3 border-t border-slate-100 pt-5">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-400">Add institution</label>
+            <input value={name} onChange={(event) => setName(event.target.value)} required placeholder="Official institution name" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Create registry record</button>
+          </form>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-black text-slate-950">Framework checklist</h3>
+            <select value={selectedFramework} onChange={(event) => { setSelectedFramework(event.target.value); setSelectedCriterion(''); setEvidenceStatus(null) }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {frameworks.map((item) => <option key={item.framework_id} value={item.framework_id}>{item.framework_id} {item.methodology_version}</option>)}
+            </select>
           </div>
-          <div className="space-y-3">
-            {framework.indicators.map(([indicator, weight]) => (
-              <div key={indicator}>
-                <div className="mb-1 flex justify-between text-sm font-bold text-slate-700">
-                  <span>{indicator}</span>
-                  <span>{Math.round(weight * 100)}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded bg-slate-100">
-                  <div className="h-full rounded" style={{ width: `${weight * 100}%`, backgroundColor: framework.color }} />
-                </div>
+          {!selectedInstitution || !framework ? (
+            <p className="mt-6 text-sm font-semibold text-slate-500">Select an institution and framework edition.</p>
+          ) : (
+            <div className="mt-5 space-y-2">
+              <div className="mb-4 rounded-lg border border-slate-200 p-3">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-400">Mapped documents</p>
+                {documents.length === 0 ? <p className="mt-2 text-sm font-semibold text-slate-500">No institution documents uploaded.</p> : documents.filter((document) => document.framework_id === selectedFramework).map((document) => <div key={`${document.id}-${document.criterion_id}`} className="mt-2 flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-700">{document.title || document.filename}</span><span className="text-xs font-bold text-slate-500">{document.review_status} · {document.research_permission_status}</span></div>)}
               </div>
-            ))}
-          </div>
-          {evaluation?.sub_scores?.[framework.name] && (
-            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs font-semibold text-slate-600">
-              Current sub-indicator points: {Object.entries(evaluation.sub_scores[framework.name]).map(([name, points]) => `${name} ${points}`).join(', ')}
+              {criteria.map((criterion) => {
+                const item = readinessByCriterion.get(criterion)
+                return <div key={criterion} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span className="font-semibold text-slate-700">{criterion}</span><span className="rounded bg-amber-100 px-2 py-1 text-xs font-black text-amber-700">{item?.evidence_status || 'unknown'}</span></div>
+              })}
+              <form onSubmit={saveReadiness} className="mt-5 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-[1fr_auto_auto]">
+                <select value={activeCriterion || ''} onChange={(event) => { setSelectedCriterion(event.target.value); setEvidenceStatus(null) }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                  {criteria.map((criterion) => <option key={criterion} value={criterion}>{criterion}</option>)}
+                </select>
+                <select value={currentEvidenceStatus} onChange={(event) => setEvidenceStatus(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                  <option value="unknown">Unknown</option>
+                  <option value="available">Available</option>
+                  <option value="incomplete">Incomplete</option>
+                  <option value="missing">Missing</option>
+                </select>
+                <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Save status</button>
+              </form>
             </div>
           )}
+          {status && <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-600">{status}</p>}
         </div>
-      ))}
-    </div>
-  </section>
-)
+      </div>
+    </section>
+  )
+}
+
+const FrameworkAnalysis = () => {
+  const [frameworks, setFrameworks] = useState([])
+  const [status, setStatus] = useState('Loading the backend framework catalog...')
+
+  useEffect(() => {
+    let active = true
+    apiFetch('/api/frameworks')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Framework catalog is unavailable.')
+        return response.json()
+      })
+      .then((data) => {
+        if (!active) return
+        setFrameworks(data.frameworks || [])
+        setStatus(data.scoring_enabled ? 'Scoring is enabled by the backend.' : 'Scoring is disabled; criteria and weights are not approved for assessment.')
+      })
+      .catch((error) => {
+        if (active) setStatus(`Framework catalog unavailable: ${error.message}`)
+      })
+    return () => { active = false }
+  }, [])
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework Criteria Catalog</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">The backend catalog is provisional and supports retrieval only. Official weights and readiness scoring are unavailable until criteria are verified and locked.</p>
+      </div>
+      <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">{status}</div>
+      {frameworks.length === 0 ? <EmptyState text="No framework catalog is available." /> : (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          {frameworks.map((framework) => (
+            <div key={framework.framework_id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-black text-slate-950">{framework.official_name}</h3>
+                  <p className="mt-1 text-sm text-slate-500">Edition {framework.methodology_version || 'not recorded'}</p>
+                </div>
+                <span className="rounded-lg bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">{framework.criteria_status || 'status unavailable'}</span>
+              </div>
+              <p className="mb-3 text-sm text-slate-600">Weight status: {framework.weight_status || 'unverified'}</p>
+              <ul className="space-y-2">
+                {Object.entries(framework.criteria || {}).map(([criterionId, description]) => (
+                  <li key={criterionId} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                    <span className="font-bold">{criterionId}</span>{description ? ` · ${description}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
 
 const ExplainableAI = ({ evaluation }) => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
       <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI & Decision Support</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Administrators can inspect score drivers, trace evidence, and identify readiness gaps by framework and criterion.</p>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Score explanations and criterion gaps are unavailable because the validated readiness scoring workflow is not implemented.</p>
     </div>
-    {!evaluation ? (
-      <EmptyState text="Upload a document to generate explanations." />
+    {!evaluation || !evaluation.strengths ? (
+      <EmptyState text="No traceable scoring output is available to explain." />
     ) : (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
@@ -695,8 +752,8 @@ const ExplainableAI = ({ evaluation }) => (
 const ChecklistView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Checklist Compliance</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Each required feature is represented in the prototype as a visible workflow, algorithm panel, metadata field, or validation control.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Research Requirements & Prototype Scope</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">These items summarize planned requirements. A visible screen or utility function does not mean the workflow is implemented or validated.</p>
     </div>
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       {checklistGroups.map(({ title, icon: Icon, items }) => (
@@ -705,7 +762,7 @@ const ChecklistView = () => (
           <div className="space-y-3">
             {items.map(([name, description]) => (
               <div key={name} className="flex gap-3 rounded-lg bg-slate-50 p-3">
-                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={18} />
+                <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={18} />
                 <div>
                   <div className="text-sm font-black text-slate-800">{name}</div>
                   <div className="mt-1 text-sm text-slate-500">{description}</div>
@@ -722,8 +779,8 @@ const ChecklistView = () => (
 const ArchitectureView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">System Architecture & Traceability</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Structure follows the dissertation modules from document intake through dashboard reporting, with each module tied to a verifiable output.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Proposed Architecture & Traceability</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">This view summarizes intended modules. Readiness scoring, score explanations, ranking history, and report artifacts are not connected to the document upload workflow.</p>
     </div>
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
       {ARCHITECTURE_MODULES.map(([module, output], index) => (
@@ -749,10 +806,10 @@ const ArchitectureView = () => (
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Report Artifacts</h3>
         <div className="space-y-3 text-sm font-semibold text-slate-600">
-          <div className="rounded-lg bg-slate-50 p-3">Requirements traceability matrix and module verification log</div>
-          <div className="rounded-lg bg-slate-50 p-3">Evidence table with source, date, page, section, framework, indicator, AES, and acceptance status</div>
-          <div className="rounded-lg bg-slate-50 p-3">RRS, ARRS, Best-Fit recommendation, close-alternative notes, and criterion-level gaps</div>
-          <div className="rounded-lg bg-slate-50 p-3">Validation summary for baseline, ablation, sensitivity, expert agreement, and ISO/IEC 25010</div>
+          <div className="rounded-lg bg-slate-50 p-3">Traceability and module verification artifacts are planned; screen presence does not establish implementation.</div>
+          <div className="rounded-lg bg-slate-50 p-3">Evidence metadata is persisted; source authorization, AES, and evidence acceptance are not verified by upload.</div>
+          <div className="rounded-lg bg-slate-50 p-3">RRS, ARRS, Best-Fit, and criterion-level gap reports are unavailable.</div>
+          <div className="rounded-lg bg-slate-50 p-3">Validation summaries require approved data and completed evaluation; no empirical results are available.</div>
         </div>
       </div>
     </div>
@@ -762,8 +819,8 @@ const ArchitectureView = () => (
 const ValidationView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Validation, Testing & QA</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Validation coverage follows baseline comparison, ablation, expert agreement, robustness, and ISO/IEC 25010 quality characteristics.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Validation Plan</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Planned validation requirements and metrics are listed below. They are not completed empirical results.</p>
     </div>
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -771,7 +828,7 @@ const ValidationView = () => (
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
             <tr>
               <th className="p-4">Validation Item</th>
-              <th className="p-4">Checklist Implementation</th>
+              <th className="p-4">Planned measure</th>
               <th className="p-4">Status</th>
             </tr>
           </thead>
@@ -780,7 +837,7 @@ const ValidationView = () => (
               <tr key={item}>
                 <td className="p-4 font-black text-slate-900">{item}</td>
                 <td className="p-4 text-slate-600">{implementation}</td>
-                <td className="p-4"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">Defined</span></td>
+                <td className="p-4"><span className="rounded bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">Not evaluated</span></td>
               </tr>
             ))}
           </tbody>
@@ -815,37 +872,584 @@ const ValidationView = () => (
   </section>
 )
 
-const HistoryView = ({ history }) => {
-  const sorted = useMemo(() => [...history].sort((a, b) => b.arrs - a.arrs), [history])
+const fetchResearchValidation = async () => {
+  const response = await apiFetch('/api/research/validation/status', {
+    credentials: 'include',
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.detail || 'Unable to load research-validation status.')
+  return data
+}
+
+const ResearchValidationView = () => {
+  const [status, setStatus] = useState(null)
+  const [selectedDatasetId, setSelectedDatasetId] = useState('')
+  const [preflightReports, setPreflightReports] = useState({})
+  const [runningConfig, setRunningConfig] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [datasetVersion, setDatasetVersion] = useState('')
+  const [annotationVersion, setAnnotationVersion] = useState('')
+  const [datasetProvenance, setDatasetProvenance] = useState('')
+  const [randomSeed, setRandomSeed] = useState('0')
+  const [annotationQueue, setAnnotationQueue] = useState([])
+  const [annotationQueueError, setAnnotationQueueError] = useState('')
+  const [reviewingExample, setReviewingExample] = useState('')
+  const [reviewDrafts, setReviewDrafts] = useState({})
+  const [datasetReviewNote, setDatasetReviewNote] = useState('')
+  const [approvingDataset, setApprovingDataset] = useState(false)
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchResearchValidation()
+      setStatus(data)
+      setSelectedDatasetId((current) => (
+        current && data.datasets.some((dataset) => dataset.id === current)
+          ? current
+          : data.datasets[0]?.id || ''
+      ))
+    } catch (loadError) {
+      setError(loadError.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedDatasetId) return
+    let active = true
+    Promise.all(['A0', 'A1', 'A2', 'A3', 'A4'].map(async (configurationId) => {
+      const params = new URLSearchParams({
+        dataset_id: selectedDatasetId,
+        configuration_id: configurationId,
+        evaluation_scope: configurationId === 'A0' ? 'retrieval' : 'readiness',
+      })
+      const response = await apiFetch(`/api/research/experiments/preflight?${params}`)
+      const report = await response.json()
+      if (!response.ok) throw new Error(report.detail || 'Unable to check experiment prerequisites.')
+      return [configurationId, report]
+    }))
+      .then((reports) => {
+        if (active) setPreflightReports({
+          datasetId: selectedDatasetId,
+          reports: Object.fromEntries(reports),
+        })
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError.message)
+      })
+    return () => { active = false }
+  }, [selectedDatasetId])
+
+  useEffect(() => {
+    if (!selectedDatasetId) return undefined
+    let active = true
+    apiFetch(`/api/research/datasets/${selectedDatasetId}/annotations`, {
+      credentials: 'include',
+    })
+      .then(async (response) => {
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.detail || 'Annotation review is unavailable.')
+        return result.annotations
+      })
+      .then((annotations) => {
+        if (active) {
+          setAnnotationQueue(annotations)
+          setAnnotationQueueError('')
+          setReviewDrafts({})
+        }
+      })
+      .catch((loadError) => {
+        if (active) {
+          setAnnotationQueue([])
+          setAnnotationQueueError(typeof loadError.message === 'string'
+            ? loadError.message
+            : JSON.stringify(loadError.message))
+        }
+      })
+    return () => { active = false }
+  }, [selectedDatasetId])
+
+  useEffect(() => {
+    let active = true
+    fetchResearchValidation()
+      .then((data) => {
+        if (active) setStatus(data)
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const handleDatasetFile = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setMessage('')
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('dataset_version', datasetVersion)
+      form.append('annotation_version', annotationVersion)
+      form.append('provenance', datasetProvenance)
+      form.append('random_seed', randomSeed)
+      const response = await apiFetch('/api/research/datasets/import', {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(typeof result.detail === 'string' ? result.detail : JSON.stringify(result.detail))
+      }
+      setMessage(`Dataset ${result.report.dataset_version} imported. Split counts: ${Object.entries(result.report.split_counts).map(([name, count]) => `${name} ${count}`).join(', ')}.`)
+      await refresh()
+    } catch (importError) {
+      setError(importError.message)
+    } finally {
+      setImporting(false)
+      event.target.value = ''
+    }
+  }
+
+  const runExperiment = async (configurationId) => {
+    setRunningConfig(configurationId)
+    setError('')
+    setMessage('')
+    try {
+      const response = await apiFetch('/api/research/experiments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          dataset_id: selectedDatasetId,
+          configuration_id: configurationId,
+          random_seed: status.datasets.find((dataset) => dataset.id === selectedDatasetId)?.split_seed ?? 0,
+          evaluation_scope: configurationId === 'A0' ? 'retrieval' : 'readiness',
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.detail || 'Experiment request failed.')
+      const scope = configurationId === 'A0' ? 'retrieval-only' : 'readiness'
+      setMessage(`${configurationId} ${scope}: ${result.execution_state}. Results are available only for completed runs.`)
+      await refresh()
+    } catch (runError) {
+      setError(runError.message)
+    } finally {
+      setRunningConfig('')
+    }
+  }
+
+  const submitAnnotationReview = async (annotation) => {
+    const draft = reviewDrafts[annotation.example_id] || {}
+    const original = /^(true|1|yes|positive|relevant)$/i.test(String(annotation.imported_label))
+    const label = draft.label === undefined ? original : draft.label === 'true'
+    const adjudication = annotation.independent_review_count >= 2
+    const decision = adjudication ? 'adjudicate' : (label === original ? 'confirm' : 'correct')
+    setReviewingExample(annotation.example_id)
+    setError('')
+    try {
+      const response = await apiFetch(`/api/research/datasets/${selectedDatasetId}/annotation-reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          reviews: [{
+            example_id: annotation.example_id,
+            label,
+            decision,
+            note: draft.note || '',
+          }],
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        const detail = typeof result.detail === 'string' ? result.detail : JSON.stringify(result.detail)
+        throw new Error(detail || 'Annotation review failed.')
+      }
+      const queueResponse = await apiFetch(`/api/research/datasets/${selectedDatasetId}/annotations`, {
+        credentials: 'include',
+      })
+      const queueResult = await queueResponse.json()
+      if (!queueResponse.ok) throw new Error(queueResult.detail || 'Unable to refresh annotation review queue.')
+      setAnnotationQueue(queueResult.annotations)
+      setReviewDrafts((current) => {
+        const next = { ...current }
+        delete next[annotation.example_id]
+        return next
+      })
+      setMessage(`Saved ${decision} for ${annotation.example_id}.`)
+    } catch (reviewError) {
+      setError(reviewError.message)
+    } finally {
+      setReviewingExample('')
+    }
+  }
+
+  const approveReviewedDataset = async () => {
+    setApprovingDataset(true)
+    setError('')
+    try {
+      const response = await apiFetch(`/api/research/datasets/${selectedDatasetId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ decision: 'approved', note: datasetReviewNote }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        const detail = typeof result.detail === 'string' ? result.detail : JSON.stringify(result.detail)
+        throw new Error(detail || 'Dataset approval failed.')
+      }
+      setMessage(`Dataset approval recorded: ${result.verification_status}.`)
+      setDatasetReviewNote('')
+      await refresh()
+    } catch (reviewError) {
+      setError(reviewError.message)
+    } finally {
+      setApprovingDataset(false)
+    }
+  }
+
+  const stateStyle = (value) => {
+    if (value === 'completed' || value === 'completed_with_limitations') return 'bg-emerald-50 text-emerald-700'
+    if (value === 'ready_to_run') return 'bg-blue-50 text-blue-700'
+    if (value === 'running') return 'bg-amber-50 text-amber-700'
+    if (value === 'failed') return 'bg-red-50 text-red-700'
+    return 'bg-slate-100 text-slate-700'
+  }
+
   return (
     <section className="space-y-6 p-6 lg:p-8">
       <div>
-        <h2 className="text-3xl font-black tracking-normal text-slate-950">School Rank & Assessment History</h2>
-        <p className="mt-2 max-w-3xl text-sm text-slate-500">Evaluated schools are ranked by ARRS and retain document source, timestamp, and best-fit framework metadata.</p>
+        <h2 className="flex items-center gap-3 text-3xl font-black tracking-normal text-slate-950"><Microscope /> Research Validation</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Reproducible research runs are separated from application tests. No empirical result is shown unless it is generated from an authorized expert-labeled dataset and traceable model configuration.</p>
       </div>
-      {sorted.length === 0 ? <EmptyState text="No assessment history yet." /> : (
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+      {message && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{message}</div>}
+      {loading && <EmptyState text="Loading research prerequisites…" />}
+      {!loading && status && (
+        <>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-lg font-black text-amber-950">
+                {status.empirical_results_available
+                  ? 'Readiness research runs are available with limitations'
+                  : status.retrieval_results_available
+                    ? 'Retrieval results are available; readiness scoring remains blocked'
+                    : 'Empirical validation is not yet available'}
+              </h3>
+              <span className={`rounded px-2 py-1 text-xs font-black ${stateStyle(status.state)}`}>{status.state}</span>
+            </div>
+            <p className="mt-2 text-sm text-amber-900">{status.empirical_result_note}</p>
+            <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-amber-900">
+              {status.missing_prerequisites.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {Object.entries(status.dataset_counts).map(([label, count]) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-xs font-bold uppercase text-slate-500">{label.replaceAll('_', ' ')}</div>
+                <div className="mt-2 text-2xl font-black text-slate-950">{count}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-slate-950">Import a research dataset</h3>
+            <p className="mt-1 text-sm text-slate-500">Upload CSV or JSONL with example_id, framework, indicator, binary label, source_document_id, institution_group_id, and either text or source_passage_id. The original file is retained privately with its SHA-256 and line-level validation report. Imports stay unapproved until independent per-example review and dataset approval are complete.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-bold text-slate-600">Dataset version
+                <input value={datasetVersion} onChange={(event) => setDatasetVersion(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" maxLength={100} />
+              </label>
+              <label className="text-xs font-bold text-slate-600">Annotation version
+                <input value={annotationVersion} onChange={(event) => setAnnotationVersion(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" maxLength={100} />
+              </label>
+              <label className="text-xs font-bold text-slate-600">Provenance
+                <input value={datasetProvenance} onChange={(event) => setDatasetProvenance(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" maxLength={2000} />
+              </label>
+              <label className="text-xs font-bold text-slate-600">Split seed
+                <input type="number" value={randomSeed} onChange={(event) => setRandomSeed(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" />
+              </label>
+            </div>
+            <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">
+              <input type="file" accept=".csv,.jsonl,text/csv,application/x-ndjson" className="sr-only" disabled={importing || !datasetVersion.trim() || !annotationVersion.trim() || !datasetProvenance.trim()} onChange={handleDatasetFile} />
+              {importing ? 'Importing…' : 'Select CSV or JSONL'}
+            </label>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-slate-950">Independent annotation review</h3>
+            <p className="mt-1 text-sm text-slate-500">Each example needs two distinct reviewers. Disagreements remain unresolved until a third reviewer adjudicates; the imported label and original model prediction are preserved separately.</p>
+            {annotationQueueError
+              ? <p role="status" className="mt-3 text-sm text-amber-800">{annotationQueueError}</p>
+              : annotationQueue.length === 0
+                ? <p className="mt-3 text-sm text-slate-500">No annotations are currently available for this reviewer, or the selected dataset has no outstanding reviews.</p>
+                : (
+                  <div className="mt-4 space-y-3">
+                    {annotationQueue.map((annotation) => {
+                      const draft = reviewDrafts[annotation.example_id] || {}
+                      const importedPositive = /^(true|1|yes|positive|relevant)$/i.test(String(annotation.imported_label))
+                      const selectedLabel = draft.label ?? (importedPositive ? 'true' : 'false')
+                      const needsAdjudication = annotation.independent_review_count >= 2
+                        && annotation.distinct_review_labels > 1
+                      return (
+                        <article key={annotation.example_id} className="rounded-lg border border-slate-200 p-4">
+                          <div className="flex flex-wrap justify-between gap-2 text-sm">
+                            <strong>{annotation.example_id} · {annotation.framework} / {annotation.indicator}</strong>
+                            <span className="text-xs text-slate-500">
+                              {needsAdjudication ? 'Adjudication required' : `${annotation.independent_review_count} of 2 independent reviews`}
+                            </span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{annotation.text || 'No evidence text was resolved.'}</p>
+                          <p className="mt-2 text-xs text-slate-500">Imported label: {String(annotation.imported_label)} · Group: {annotation.institution_group_id}</p>
+                          {annotation.original_prediction_json && <pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs text-slate-500">Original model prediction: {annotation.original_prediction_json}</pre>}
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <label className="text-xs font-bold text-slate-600">Reviewed relevance
+                              <select value={selectedLabel} onChange={(event) => setReviewDrafts((current) => ({
+                                ...current,
+                                [annotation.example_id]: { ...current[annotation.example_id], label: event.target.value },
+                              }))} className="mt-1 block w-full rounded border border-slate-300 bg-white p-2 text-sm">
+                                <option value="true">Relevant</option>
+                                <option value="false">Not relevant</option>
+                              </select>
+                            </label>
+                            <label className="text-xs font-bold text-slate-600">Review rationale
+                              <input value={draft.note || ''} onChange={(event) => setReviewDrafts((current) => ({
+                                ...current,
+                                [annotation.example_id]: { ...current[annotation.example_id], note: event.target.value },
+                              }))} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" minLength={10} maxLength={2000} />
+                            </label>
+                          </div>
+                          <button type="button" disabled={reviewingExample === annotation.example_id || (draft.note || '').trim().length < 10} onClick={() => submitAnnotationReview(annotation)} className="mt-3 rounded bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">
+                            {reviewingExample === annotation.example_id ? 'Saving…' : needsAdjudication ? 'Submit adjudication' : 'Submit independent review'}
+                          </button>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
+            {status.datasets.find((dataset) => dataset.id === selectedDatasetId)?.verification_status === 'submitted' && (
+              <div className="mt-5 border-t pt-4">
+                <label className="block text-xs font-bold text-slate-600">Dataset approval rationale
+                  <input value={datasetReviewNote} onChange={(event) => setDatasetReviewNote(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 text-sm" minLength={10} maxLength={2000} />
+                </label>
+                <button type="button" disabled={approvingDataset || datasetReviewNote.trim().length < 10} onClick={approveReviewedDataset} className="mt-3 rounded bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">
+                  {approvingDataset ? 'Approving…' : 'Approve after annotation review'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {status.ablations.map((ablation) => (
+              <article key={ablation.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                {(() => {
+                  const reports = preflightReports.datasetId === selectedDatasetId
+                    ? preflightReports.reports
+                    : {}
+                  const report = reports[ablation.id]
+                  const isChecking = Boolean(selectedDatasetId) && !report && !error
+                  const runDisabled = !selectedDatasetId || !report?.execution_allowed || isChecking || Boolean(runningConfig)
+                  const blockers = report?.checks.filter((check) => check.status !== 'passed') || []
+                  return (
+                    <>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wide text-slate-400">{ablation.id}</div>
+                    <h3 className="mt-1 text-base font-black text-slate-950">{ablation.name}</h3>
+                    {ablation.id === 'A0' && <p className="mt-1 text-xs font-semibold text-amber-800">Available run scope: held-out Sentence-BERT retrieval only. Readiness/AHP–TOPSIS output remains blocked.</p>}
+                  </div>
+                  <span className={`shrink-0 rounded px-2 py-1 text-xs font-black ${stateStyle(report?.state || ablation.status)}`}>{report?.state || ablation.status}</span>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  {Object.entries(ablation.components).map(([component, value]) => (
+                    <div key={component} className="rounded bg-slate-50 p-2">
+                      <dt className="font-bold">{component.replaceAll('_', ' ')}</dt>
+                      <dd className="mt-1">{String(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <label className="mt-4 block text-xs font-bold text-slate-600">
+                  Dataset version
+                  <select
+                    className="mt-1 block w-full rounded border border-slate-300 bg-white p-2 text-sm"
+                    value={selectedDatasetId}
+                    onChange={(event) => setSelectedDatasetId(event.target.value)}
+                  >
+                    <option value="">Select a dataset</option>
+                    {status.datasets.map((dataset) => (
+                      <option key={dataset.id} value={dataset.id}>
+                        {dataset.dataset_version} · {dataset.verification_status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-3 text-xs text-slate-600">
+                  {report?.dataset
+                    ? `Train ${report.dataset.partition_counts.train} · Validation ${report.dataset.partition_counts.validation} · Test ${report.dataset.partition_counts.test}`
+                    : 'Partition counts are unavailable until a dataset is selected.'}
+                </div>
+                {report && (
+                  <>
+                    <p className="mt-2 text-xs text-slate-600">
+                      Model: {report.model.role} · {report.model.version || 'artifact unavailable'}
+                      {` · Artifact digest ${report.model.artifact_hash_verified ? `verified (${report.model.artifact_sha256})` : 'not verified'}`}
+                      {report.protocol_version ? ` · Protocol ${report.protocol_version}` : ''}
+                    </p>
+                    {report.retrieval_query_counts && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        Test queries: {report.retrieval_query_counts.eligible_test_queries} eligible of {report.retrieval_query_counts.test_queries}
+                      </p>
+                    )}
+                  </>
+                )}
+                <ul className="mt-3 space-y-1 text-xs text-slate-600">
+                  {blockers.map((check) => <li key={check.name}><strong>{check.name}:</strong> {check.reason}</li>)}
+                </ul>
+                <button
+                  type="button"
+                  className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                  disabled={runDisabled}
+                  title={runDisabled ? (blockers[0]?.reason || 'Check prerequisites before running.') : 'Run this experiment'}
+                  onClick={() => runExperiment(ablation.id)}
+                >
+                  {runningConfig === ablation.id ? 'Running…' : isChecking ? 'Checking prerequisites…' : ablation.id === 'A0' ? 'Run A0 retrieval' : `Run ${ablation.id}`}
+                </button>
+                {runDisabled && <p className="mt-2 text-xs text-slate-500">Run is disabled: {blockers[0]?.reason || 'Select a dataset and complete preflight.'}</p>}
+                    </>
+                  )
+                })()}
+              </article>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-slate-950">Versioned datasets</h3>
+            {status.datasets.length === 0 ? <p className="mt-2 text-sm text-slate-500">No research datasets are stored for this institution.</p> : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[620px] text-left text-sm">
+                  <thead className="border-b bg-slate-50 text-xs font-black uppercase text-slate-500">
+                    <tr><th className="p-3">Dataset</th><th className="p-3">Review status</th><th className="p-3">Annotation</th><th className="p-3">Train / Validation / Test</th><th className="p-3">Seed</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {status.datasets.map((dataset) => (
+                      <tr key={dataset.id}>
+                        <td className="p-3 font-bold">{dataset.dataset_version}</td>
+                        <td className="p-3">{dataset.verification_status}</td>
+                        <td className="p-3">{dataset.annotation_version}</td>
+                        <td className="p-3">{dataset.train_count} / {dataset.validation_count} / {dataset.test_count}</td>
+                        <td className="p-3">{dataset.split_seed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-black text-slate-950">Implemented metric infrastructure</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {status.implemented_metrics.map((metric) => <span key={metric} className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{metric}</span>)}
+            </div>
+            <p className="mt-3 text-sm text-slate-500">Metrics are not displayed as results until an eligible experiment has completed.</p>
+          </div>
+          {status.research_runs.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-lg font-black text-slate-950">Stored experiment runs</h3>
+              <div className="mt-3 space-y-3">
+                {status.research_runs.map((run) => (
+                  <div key={run.id} className="rounded-lg bg-slate-50 p-3">
+                    <div className="flex flex-wrap justify-between gap-2 text-sm">
+                      <span className="font-bold">{run.configuration_id} · {run.experiment_type} · {run.dataset_id || 'no approved dataset link'}</span>
+                      <span className={`rounded px-2 py-1 text-xs font-black ${stateStyle(run.execution_state || run.status)}`}>{run.execution_state || run.status}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">Scope: {run.configuration?.evaluation_scope || 'readiness'} · Model: {run.model_version || 'not recorded'} · Method: {run.method_version} · Seed: {run.random_seed}</div>
+                    {(run.execution_state === 'completed' || run.execution_state === 'completed_with_limitations') && run.result && (
+                      <>
+                        <div className="mt-2 text-xs text-slate-600">Samples: {JSON.stringify(run.sample_counts || {})} · Evaluation: {JSON.stringify(run.evaluation_config || {})}</div>
+                        {run.result.limitations?.length > 0 && <p className="mt-2 text-xs text-amber-800">Limitations: {run.result.limitations.join('; ')}</p>}
+                        <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs text-slate-700">{JSON.stringify(run.result, null, 2)}</pre>
+                      </>
+                    )}
+                    {run.execution_state === 'failed' && <p className="mt-2 text-xs text-red-700">{run.error_summary || 'Execution failed; no results were stored.'}</p>}
+                    {run.preflight?.checks && run.execution_state !== 'completed' && (
+                      <ul className="mt-2 space-y-1 text-xs text-amber-900">
+                        {run.preflight.checks.filter((check) => check.status !== 'passed').map((check) => <li key={check.name}>{check.name}: {check.reason}</li>)}
+                      </ul>
+                    )}
+                    {run.warnings?.length > 0 && <p className="mt-2 text-xs text-amber-800">Warnings: {run.warnings.join('; ')}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+const HistoryView = () => {
+  const [assessments, setAssessments] = useState([])
+  const [status, setStatus] = useState('Loading persisted assessment records...')
+
+  useEffect(() => {
+    let active = true
+    apiFetch('/api/assessments')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Assessment records are unavailable.')
+        return response.json()
+      })
+      .then((data) => {
+        if (!active) return
+        const records = data.assessments || []
+        setAssessments(records)
+        setStatus(records.length ? '' : 'No persisted assessment records are available.')
+      })
+      .catch((error) => {
+        if (active) setStatus(`Assessment history unavailable: ${error.message}`)
+      })
+    return () => { active = false }
+  }, [])
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">Persisted Assessment Records</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">This view lists backend workflow records and their processing state. Ranking scores and Best-Fit recommendations are not implemented.</p>
+      </div>
+      {status && <div role="status" className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">{status}</div>}
+      {assessments.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left">
+            <table className="w-full min-w-[720px] text-left">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
                 <tr>
-                  <th className="p-4">Rank</th>
                   <th className="p-4">Institution</th>
-                  <th className="p-4">Document Source</th>
-                  <th className="p-4">Best-Fit Framework</th>
-                  <th className="p-4">Timestamp</th>
-                  <th className="p-4 text-right">ARRS</th>
+                  <th className="p-4">Assessment ID</th>
+                  <th className="p-4">Workflow status</th>
+                  <th className="p-4">Created</th>
+                  <th className="p-4">Updated</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {sorted.map((item, index) => (
-                  <tr key={`${item.filename}-${item.timestamp}`}>
-                    <td className="p-4 font-black text-slate-950">#{index + 1}</td>
-                    <td className="p-4 font-bold text-slate-800">{item.schoolName}</td>
-                    <td className="p-4 text-slate-500">{item.filename}</td>
-                    <td className="p-4 text-slate-600">{item.bestFit}</td>
-                    <td className="p-4 text-slate-500">{item.timestamp}</td>
-                    <td className="p-4 text-right font-black text-slate-950">{item.arrs}</td>
+                {assessments.map((item) => (
+                  <tr key={item.id}>
+                    <td className="p-4 font-bold text-slate-800">{item.institution_name || 'Institution unavailable'}</td>
+                    <td className="p-4 font-mono text-xs text-slate-600">{item.id}</td>
+                    <td className="p-4 text-slate-700">{item.status || 'status unavailable'}</td>
+                    <td className="p-4 text-slate-500">{item.created_at || 'not recorded'}</td>
+                    <td className="p-4 text-slate-500">{item.updated_at || 'not recorded'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -857,6 +1461,652 @@ const HistoryView = ({ history }) => {
   )
 }
 
+// Retained as a legacy prototype component; the authenticated dashboard uses persisted institutions.
+// eslint-disable-next-line no-unused-vars
+const NewSubmission = ({ submissions, setSubmissions, universities }) => {
+  const navigate = useNavigate()
+  const [universityId, setUniversityId] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [files, setFiles] = useState([])
+  const [error, setError] = useState('')
+  const selectedUniversity = universities.find((university) => university.id === universityId)
+
+
+
+  const handleFiles = (event) => {
+    const selectedFiles = Array.from(event.target.files || [])
+
+    if (selectedFiles.length === 0) {
+      return
+    }
+
+    setFiles((previous) => {
+      const existingNames = new Set(previous.map((file) => file.name))
+
+      const newFiles = selectedFiles.filter(
+        (file) => !existingNames.has(file.name)
+      )
+
+      return [...previous, ...newFiles]
+    })
+
+    event.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setFiles((previous) => previous.filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    setError('')
+
+    if (!selectedUniversity) {
+      setError('Please select a university.')
+      return
+    }
+
+    if (!title.trim()) {
+      setError('Please enter a submission title.')
+      return
+    }
+
+    if (files.length === 0) {
+      setError('Please upload at least one document.')
+      return
+    }
+
+    const submissionId = `SUB-${String(submissions.length + 1).padStart(4, '0')}-${Date.now()}`
+
+    const newSubmission = {
+      id: submissionId,
+      universityName: selectedUniversity.name,
+      title: title.trim(),
+      description: description.trim(),
+      status: 'Pending',
+      createdAt: new Date().toLocaleString(),
+      documents: files.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })),
+    }
+
+    setSubmissions((previous) => [newSubmission, ...previous])
+    navigate(`/submissions/${submissionId}`)
+  }
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div className="border-b border-slate-200 pb-6">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="mb-4 text-sm font-bold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Dashboard
+        </button>
+
+        <p className="text-xs font-black uppercase text-slate-400">
+          Client 1
+        </p>
+
+        <h2 className="mt-1 text-3xl font-black text-slate-950">
+          New Submission
+        </h2>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Create a new university submission and attach multiple supporting documents.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-black text-slate-950">
+            University Information
+          </h3>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              University
+            </label>
+
+            <select
+              value={universityId}
+              onChange={(event) => setUniversityId(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900"
+            >
+              <option value="">Select a university</option>
+
+              {universities.map((university) => (
+                <option key={university.id} value={university.id}>
+                  {university.name} ({university.shortName})
+                </option>
+              ))}
+            </select>
+
+            {selectedUniversity && (
+              <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                <span className="font-bold">Location:</span>{' '}
+                {selectedUniversity.location}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-black text-slate-950">
+            Submission Details
+          </h3>
+
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                Submission Title
+              </label>
+
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Example: WURI 2026 Institutional Submission"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                Description
+              </label>
+
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={4}
+                placeholder="Add notes or additional information about this submission..."
+                className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h3 className="text-lg font-black text-slate-950">
+                Supporting Documents
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Upload multiple PDF, DOCX, or TXT files for this submission.
+              </p>
+            </div>
+
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800">
+              + Add Documents
+
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.txt"
+                onChange={handleFiles}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {files.length === 0 ? (
+            <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <CloudUpload className="mx-auto mb-3 text-slate-400" size={36} />
+
+              <p className="font-bold text-slate-700">
+                No documents selected
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Click "Add Documents" to select multiple files.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-2">
+              {files.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <FileText size={20} className="shrink-0 text-slate-500" />
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-800">
+                        {file.name}
+                      </p>
+
+                      <p className="text-xs text-slate-500">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="ml-3 rounded px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-6 py-3 text-sm font-black text-white hover:bg-slate-800"
+          >
+            Submit Documents
+          </button>
+        </div>
+      </form>
+    </section>
+  )
+}
+// Retained as a legacy prototype component; the authenticated dashboard uses persisted institutions.
+// eslint-disable-next-line no-unused-vars
+const ClientDashboard = ({ submissions }) => {
+  const navigate = useNavigate()
+  const [schoolFilter, setSchoolFilter] = useState('')
+
+  const normalizedFilter = schoolFilter.trim().toLowerCase()
+
+  const filteredSubmissions = normalizedFilter
+    ? submissions.filter((submission) =>
+        (submission.universityName || '')
+          .toLowerCase()
+          .includes(normalizedFilter)
+      )
+    : submissions
+
+  const totalSubmissions = filteredSubmissions.length
+
+  const pendingCount = filteredSubmissions.filter(
+    (submission) => submission.status === 'Pending'
+  ).length
+
+  const underReviewCount = filteredSubmissions.filter(
+    (submission) => submission.status === 'Under Review'
+  ).length
+
+  const completedCount = filteredSubmissions.filter(
+    (submission) => submission.status === 'Completed'
+  ).length
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+            Client 1
+          </p>
+
+          <h1 className="mt-1 text-3xl font-black text-slate-950">
+            Submission Dashboard
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Manage and monitor your university submissions.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/submission/new')}
+          className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+        >
+          + New Submission
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <label className="mb-2 block text-sm font-black text-slate-700">
+          School / University
+        </label>
+
+        <input
+          type="text"
+          value={schoolFilter}
+          onChange={(event) => setSchoolFilter(event.target.value)}
+          placeholder="Enter school / university name"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-900 md:max-w-xl"
+        />
+
+        <p className="mt-2 text-xs text-slate-500">
+          {schoolFilter.trim()
+            ? 'Showing submissions matching the school name.'
+            : 'Enter a school name to filter submissions.'}
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Total Submissions
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            {totalSubmissions}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Pending
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-amber-600">
+            {pendingCount}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Under Review
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-blue-600">
+            {underReviewCount}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Completed
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-emerald-600">
+            {completedCount}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">
+              Recent Submissions
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              {schoolFilter.trim()
+                ? 'Submissions matching the entered school.'
+                : 'Your latest submissions across all schools.'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/submissions')}
+            className="text-sm font-black text-slate-700 hover:text-slate-950"
+          >
+            View All
+          </button>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {filteredSubmissions.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="font-bold text-slate-700">
+                No submissions found.
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Create a new submission to get started.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => navigate('/submission/new')}
+                className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white"
+              >
+                + New Submission
+              </button>
+            </div>
+          ) : (
+            filteredSubmissions.slice(0, 5).map((submission) => (
+              <button
+                type="button"
+                key={submission.id}
+                onClick={() => navigate('/submissions/' + submission.id)}
+                className="flex w-full flex-col gap-3 px-6 py-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-black text-slate-950">
+                      {submission.id}
+                    </span>
+
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                      {submission.universityName}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm font-bold text-slate-800">
+                    {submission.title}
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    {submission.documents?.length || 0} supporting document(s)
+                    {' · '}
+                    {submission.createdAt}
+                  </p>
+                </div>
+
+                <span
+                  className={
+                    'rounded-lg px-3 py-1.5 text-xs font-black ' +
+                    (submission.status === 'Completed'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : submission.status === 'Under Review'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-amber-100 text-amber-700')
+                  }
+                >
+                  {submission.status}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+// Retained as a legacy prototype component; the authenticated dashboard uses persisted institutions.
+// eslint-disable-next-line no-unused-vars
+const SubmissionDetails = ({ submissions }) => {
+  const navigate = useNavigate()
+  const { submissionId } = useParams()
+
+  const submission = submissions.find(
+    (item) => item.id === submissionId
+  )
+
+  if (!submission) {
+    return (
+      <section className="space-y-6 p-6 lg:p-8">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="text-sm font-bold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Dashboard
+        </button>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
+          <h2 className="text-2xl font-black text-slate-950">
+            Submission Not Found
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            The requested submission could not be found.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="mb-4 text-sm font-bold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Dashboard
+        </button>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Submission Details
+            </p>
+
+            <h2 className="mt-1 text-3xl font-black text-slate-950">
+              {submission.id}
+            </h2>
+
+            <p className="mt-2 text-sm font-semibold text-slate-500">
+              {submission.createdAt}
+            </p>
+          </div>
+
+          <span
+            className={
+              submission.status === 'Completed'
+                ? 'rounded-lg bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-700'
+                : submission.status === 'Under Review'
+                  ? 'rounded-lg bg-blue-100 px-4 py-2 text-xs font-black text-blue-700'
+                  : 'rounded-lg bg-amber-100 px-4 py-2 text-xs font-black text-amber-700'
+            }
+          >
+            {submission.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Submission Information
+          </p>
+
+          <h3 className="mt-2 text-2xl font-black text-slate-950">
+            {submission.title}
+          </h3>
+
+          <div className="mt-6 space-y-4">
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">
+                University
+              </p>
+              <p className="mt-1 font-bold text-slate-900">
+                {submission.universityName}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">
+                Description
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                {submission.description || 'No description provided.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Submission Summary
+          </p>
+
+          <div className="mt-5">
+            <p className="text-4xl font-black text-slate-950">
+              {submission.documents.length}
+            </p>
+
+            <p className="text-sm font-semibold text-slate-500">
+              Documents Uploaded
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Uploaded Documents
+            </p>
+
+            <h3 className="mt-1 text-xl font-black text-slate-950">
+              {submission.documents.length} Documents
+            </h3>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {submission.documents.map((document, index) => (
+            <div
+              key={document.name + '-' + index}
+              className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700">
+                  {index + 1}
+                </div>
+
+                <div>
+                  <p className="font-bold text-slate-900">
+                    {document.name}
+                  </p>
+
+                  <p className="text-xs font-semibold text-slate-400">
+                    {document.type || 'Document'}
+                  </p>
+                </div>
+              </div>
+
+              <span className="text-xs font-bold text-slate-400">
+                {document.size
+                  ? Math.max(1, Math.round(document.size / 1024))
+                  : 0}{' '}
+                KB
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 const EmptyState = ({ text }) => (
   <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm font-semibold text-slate-500 shadow-sm">{text}</div>
 )
@@ -892,6 +2142,8 @@ const Shell = ({ children, onLogout }) => {
           <NavLink to="/architecture" icon={Network} onClick={closeMenu}>Architecture</NavLink>
           <NavLink to="/checklist" icon={BookOpenCheck} onClick={closeMenu}>Checklist</NavLink>
           <NavLink to="/validation" icon={Microscope} onClick={closeMenu}>Validation QA</NavLink>
+          <NavLink to="/research-validation" icon={FileSearch} onClick={closeMenu}>Research Validation</NavLink>
+          <NavLink to="/institutions" icon={Building2} onClick={closeMenu}>Institutions</NavLink>
         </nav>
         <div className="border-t border-slate-100 p-3">
           <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-700">
@@ -906,42 +2158,61 @@ const Shell = ({ children, onLogout }) => {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecking, setAuthChecking] = useState(true)
   const [evaluation, setEvaluation] = useState(null)
-  const [history, setHistory] = useState([])
+  useEffect(() => {
+    apiFetch('/api/auth/session')
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Authentication required')
+        }
+        return response.json()
+      })
+      .then(() => setIsAuthenticated(true))
+      .catch(() => setIsAuthenticated(false))
+      .finally(() => setAuthChecking(false))
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' })
+    } finally {
+      setIsAuthenticated(false)
+      setEvaluation(null)
+    }
+  }
 
   const handleEvaluation = (nextEvaluation) => {
     setEvaluation(nextEvaluation)
-    setHistory((previous) => [
-      {
-        filename: nextEvaluation.filename,
-        schoolName: nextEvaluation.school_name,
-        timestamp: new Date().toLocaleString(),
-        bestFit: nextEvaluation.best_fit,
-        arrs: nextEvaluation.arrs,
-      },
-      ...previous,
-    ])
   }
 
   return (
+    authChecking ? (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-bold text-slate-600">
+        Checking authentication...
+      </div>
+    ) : (
     <Routes>
       <Route path="/login" element={<Login onLogin={setIsAuthenticated} />} />
       <Route path="/*" element={isAuthenticated ? (
-        <Shell onLogout={() => setIsAuthenticated(false)}>
+        <Shell onLogout={handleLogout}>
           <Routes>
-            <Route path="/" element={<Dashboard evaluation={evaluation} history={history} />} />
+            <Route path="/" element={<PersistedDashboard />} />
             <Route path="/upload" element={<DocumentUpload onEvaluation={handleEvaluation} />} />
             <Route path="/evidence" element={<EvidenceView evaluation={evaluation} />} />
-            <Route path="/analysis" element={<FrameworkAnalysis evaluation={evaluation} />} />
+            <Route path="/analysis" element={<FrameworkAnalysis />} />
             <Route path="/xai" element={<ExplainableAI evaluation={evaluation} />} />
-            <Route path="/history" element={<HistoryView history={history} />} />
+        <Route path="/history" element={<HistoryView />} />
             <Route path="/architecture" element={<ArchitectureView />} />
             <Route path="/checklist" element={<ChecklistView />} />
             <Route path="/validation" element={<ValidationView />} />
+            <Route path="/research-validation" element={<ResearchValidationView />} />
+            <Route path="/institutions" element={<InstitutionRegistry />} />
           </Routes>
         </Shell>
       ) : <Navigate to="/login" replace />} />
     </Routes>
+    )
   )
 }
 

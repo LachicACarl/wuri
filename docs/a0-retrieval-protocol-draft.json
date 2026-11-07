@@ -1,0 +1,208 @@
+{
+  "draft_status": "pending_researcher_approval",
+  "approval_status": "pending_researcher_approval",
+  "chapter3_verified": true,
+  "methodology_source": {
+    "document": "UniversityRanking_V3.1.docx",
+    "chapter": "Chapter 3",
+    "sections_reviewed": [
+      "3.2",
+      "3.3",
+      "3.5",
+      "3.7",
+      "3.8",
+      "3.9",
+      "3.10"
+    ],
+    "tables_reviewed": [
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.8",
+      "3.9"
+    ],
+    "adviser_comments_present": false,
+    "note": "Source was directly inspected. No embedded Word comments or tracked changes were found; separate adviser comments were not available."
+  },
+  "protocol_version": null,
+  "approved_by": null,
+  "approval_reference": null,
+  "models": {
+    "baseline": {
+      "approved": false,
+      "version": null,
+      "artifact_sha256": null,
+      "configuration": {
+        "max_seq_length": null
+      },
+      "implementation_candidate": {
+        "configuration_key": "max_seq_length",
+        "value": "Researcher must select and approve a positive integer; Chapter 3 does not specify this model setting."
+      }
+    }
+  },
+  "framework_data_lock": {
+    "approved": false,
+    "framework_versions": {
+      "WURI": "2026",
+      "THE World University Rankings": "2026",
+      "QS World University Rankings": "2026",
+      "UI GreenMetric": "2025"
+    },
+    "source_references": null,
+    "catalog_digests": null,
+    "note": "Versions are specified by Chapter 3 Section 3.2.3 and Table 3.1. Official criteria/weight sources and their locked digests have not been supplied or verified."
+  },
+  "chapter3_requirements": {
+    "institutional_evidence": {
+      "required": "Official institutional evidence supplied by participating HEIs with formal authorization/DUA; source/date/page-or-section/unit traceability and authenticity/readability/relevance screening.",
+      "source": "Sections 3.2.1-3.2.2 and 3.9",
+      "satisfied": false
+    },
+    "expert_validation": {
+      "domain_expert_count": 5,
+      "independent_judgments_before_consensus": true,
+      "categorical_agreement": "Fleiss' kappa",
+      "continuous_or_quasi_continuous_agreement": "ICC",
+      "source": "Sections 3.3.1 and 3.3.4; Tables 3.2-3.3",
+      "implementation_satisfied": false,
+      "workflow_infrastructure_implemented": true,
+      "real_qualified_reviews_present": false,
+      "consensus_procedure_approved": false,
+      "icc_model_approved": false,
+      "missing_rating_policy_approved": false,
+      "note": "Five-reviewer persistence/API and Fleiss' kappa integration are implemented, but no actual expert qualifications or judgments are present. ICC(2,1) is diagnostic only; expert eligibility, consensus, ICC model, missingness, and interpretation rules still require researcher/adviser approval."
+    },
+    "dataset_split": {
+      "proportions": {
+        "train": 0.7,
+        "validation": 0.15,
+        "test": 0.15
+      },
+      "stratify_by": [
+        "framework",
+        "major_indicator_group"
+      ],
+      "where_sample_size_permits": true,
+      "same_partitions_for_baseline_and_proposed": true,
+      "source": "Section 3.5.4 and Section 3.7.4"
+    },
+    "retrieval": {
+      "metrics": [
+        "Precision@K",
+        "Recall@K",
+        "cosine_similarity"
+      ],
+      "k_values": [
+        1,
+        3,
+        5
+      ],
+      "query_and_aggregation_details_specified": false,
+      "source": "Sections 3.5.4 and 3.7.3"
+    },
+    "eqam": {
+      "dimensions": [
+        "semantic_relevance",
+        "model_confidence",
+        "evidence_completeness",
+        "source_reliability",
+        "evidence_strength"
+      ],
+      "primary_equal_weights": {
+        "semantic_relevance": 0.2,
+        "model_confidence": 0.2,
+        "evidence_completeness": 0.2,
+        "source_reliability": 0.2,
+        "evidence_strength": 0.2
+      },
+      "all_dimensions_normalized_0_to_1": true,
+      "source": "Sections 3.5.5-3.5.6 and Table 3.4"
+    },
+    "acceptance_threshold": {
+      "selected_on": "validation",
+      "expert_labels": [
+        "acceptable",
+        "insufficient"
+      ],
+      "priority": [
+        "macro-F1",
+        "balanced precision-recall behavior"
+      ],
+      "locked_before_test_evaluation": true,
+      "exact_tie_break_specified": false,
+      "source": "Section 3.5.6 and Sections 3.7.3, 3.7.7"
+    },
+    "framework_scoring": {
+      "published_weights_fixed_where_available": true,
+      "ahp_scope": "Subcriteria or operational mappings without directly usable official weights",
+      "maximum_accepted_consistency_ratio": 0.1,
+      "topsis_ideal_anchor": "final criterion weight",
+      "topsis_anti_ideal_anchor": 0,
+      "rrs_scale": [
+        0,
+        100
+      ],
+      "arrs_framework_weights": "equal",
+      "best_fit": "highest validated RRS",
+      "close_alternative_margin_points": 5,
+      "close_margin_expert_validation_required": true,
+      "source": "Sections 3.5.7-3.5.11; Table 3.5; Section 3.7.6"
+    },
+    "ablations": {
+      "A0": "Pretrained Sentence-BERT + conventional AHP-TOPSIS",
+      "A1": "Domain-adapted Sentence-BERT + conventional AHP-TOPSIS",
+      "A2": "Enhanced Sentence-BERT + EQAM + conventional AHP-TOPSIS",
+      "A3": "A2 + framework-constrained AHP + fixed-reference TOPSIS",
+      "A4": "A3 + XAI; evaluate XAI separately from numerical score improvement",
+      "source": "Sections 3.7.4-3.7.5 and Table 3.9"
+    }
+  },
+  "retrieval_evaluation": {
+    "approved": false,
+    "version": null,
+    "k_values": [1, 3, 5],
+    "relevant_labels": ["1", "positive", "relevant", "true", "yes"],
+    "non_relevant_labels": ["0", "false", "negative", "no", "not_relevant"],
+    "model_parameters": {
+      "normalize_embeddings": true,
+      "batch_size": 32
+    },
+    "metric_definitions": {
+      "query_unit": "framework_indicator_pair",
+      "candidate_pool": "test_partition_records_matching_framework_and_indicator",
+      "eligible_query_rule": "at_least_one_relevant_candidate",
+      "precision_denominator": "k",
+      "recall_denominator": "relevant_candidates_in_query_pool",
+      "per_framework_aggregation": "macro_mean_over_eligible_queries",
+      "overall_aggregation": "macro_mean_over_all_eligible_queries",
+      "undefined_metric_policy": "null_when_no_eligible_queries",
+      "ranking_tie_break": "example_id_ascending"
+    },
+    "note": "K = 1, 3, and 5 is specified in Chapter 3. Query unit, candidate-pool rule, eligibility, aggregation, undefined-metric behavior, and tie-breaking below remain implementation candidates only; Chapter 3 does not specify them."
+  },
+  "indicator_configuration": {
+    "approved": false,
+    "version": null,
+    "catalog_sha256": "14193d23ca4e4dd8695dda6cd00063b9ff21ec38c47067fc72c659bb46bc591d",
+    "note": "Digest identifies the current provisional code catalog; authoritative provenance and approval are missing."
+  },
+  "decisions_requiring_researcher_approval": [
+    "Obtain and verify the official criteria and published weights for the four Table 3.1 framework editions; record authoritative sources and locked digests.",
+    "Obtain authorized HEI institutional evidence, source provenance, DUA/institutional clearance, and privacy approval; the WURI workbook pilot is not that corpus.",
+    "Approve expert eligibility criteria and the consensus/adjudication procedure; verify genuine qualifications and obtain five independent judgments per case. The five-review infrastructure and Fleiss' kappa integration exist, but no real reviews are present.",
+    "Select and approve the ICC model, complete-case/missing-rating policy, minimum case requirements, and agreement interpretation rules. The ICC(2,1) output is a diagnostic candidate only.",
+    "Specify the rubric anchors and rater instructions for completeness, source reliability, and evidence strength.",
+    "Select the calibrated model-confidence computation and its calibration procedure.",
+    "Specify criterion aggregation from multiple/contradictory/missing/duplicate/stale evidence into x_fj.",
+    "Approve the operational definition of balanced precision-recall behavior and threshold tie-breaking while preserving validation-only calibration and a locked test set.",
+    "Approve retrieval query unit, candidate pool, query eligibility, metric aggregation, undefined-metric behavior, and tie-breaking. P@K/R@K cutoffs K = 1, 3, 5 are specified by Chapter 3.",
+    "Select the exact pretrained baseline identity/revision and approve its artifact provenance, checksum, and model-specific settings, which Chapter 3 does not specify.",
+    "Approve the additional leakage grouping/normalization/shingle/Jaccard/seed choices; Chapter 3 specifies stratification by framework and major indicator group where sample size permits, not those implementation details.",
+    "Confirm/approve the proposed five-point close-margin rule through expert validation before final evaluation and approve readiness interpretation bands.",
+    "Implement and verify the full Chapter 3 A0 conventional Sentence-BERT + AHP-TOPSIS baseline and A1-A4 configurations; the current A0 executor is retrieval-only.",
+    "Provide separate adviser comments if applicable; none were embedded in the reviewed DOCX."
+  ]
+}

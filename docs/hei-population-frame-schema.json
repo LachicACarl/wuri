@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wuri.local/schemas/hei-population-frame-record.json",
+  "title": "Philippine HEI population frame record",
+  "description": "Proposed schema for an auditable candidate HEI frame. It preserves source values and does not imply study eligibility, consent, participation, or framework qualification.",
+  "type": "object",
+  "required": [
+    "record_id",
+    "frame_version",
+    "frame_status",
+    "source_records",
+    "identity",
+    "classification",
+    "relationships",
+    "reconciliation",
+    "decision_provenance"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "pattern": "^hei_[A-Za-z0-9_-]+$"
+    },
+    "frame_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frame_status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "under_review",
+        "frozen",
+        "superseded"
+      ]
+    },
+    "source_records": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceRecord"
+      },
+      "minItems": 1
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "classification": {
+      "$ref": "#/$defs/classification"
+    },
+    "relationships": {
+      "$ref": "#/$defs/relationships"
+    },
+    "reconciliation": {
+      "$ref": "#/$defs/reconciliation"
+    },
+    "framework_eligibility": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/frameworkEligibility"
+      }
+    },
+    "study_status": {
+      "$ref": "#/$defs/studyStatus"
+    },
+    "decision_provenance": {
+      "$ref": "#/$defs/decisionProvenance"
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceRecord": {
+      "type": "object",
+      "required": [
+        "source_snapshot_id",
+        "source_name",
+        "source_url_or_path",
+        "retrieved_at",
+        "raw_record_key",
+        "raw_values"
+      ],
+      "properties": {
+        "source_snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuing_organization": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "source_url_or_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_or_update_date": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "reference_period": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "raw_record_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_unit_label": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "raw_values": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "stable_internal_id",
+        "raw_names",
+        "standardized_name"
+      ],
+      "properties": {
+        "stable_internal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ched_identifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "other_source_identifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "source_snapshot_id",
+              "identifier"
+            ],
+            "properties": {
+              "source_snapshot_id": {
+                "type": "string"
+              },
+              "identifier": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "raw_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "standardized_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "former_or_alternate_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "classification": {
+      "type": "object",
+      "properties": {
+        "raw_sector": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "standardized_sector": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "public",
+            "private",
+            "other",
+            null
+          ]
+        },
+        "raw_institution_type": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "standardized_institution_type": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "raw_region": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "standardized_region": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "raw_location": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "inactive",
+            "closed",
+            "merged",
+            "renamed",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "relationships": {
+      "type": "object",
+      "required": [
+        "unit_type"
+      ],
+      "properties": {
+        "unit_type": {
+          "type": "string",
+          "enum": [
+            "institution",
+            "campus",
+            "branch",
+            "unknown"
+          ]
+        },
+        "parent_institution_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "campus_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "campus_identifier": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "relationship_confidence": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "probable",
+            "conflicted",
+            "unresolved",
+            "not_applicable"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "reconciliation": {
+      "type": "object",
+      "required": [
+        "status",
+        "duplicate_group_id",
+        "unresolved_issue_ids"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "included",
+            "excluded",
+            "probable_duplicate",
+            "conflict",
+            "unresolved"
+          ]
+        },
+        "duplicate_group_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "matched_record_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_issue_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "normalization_rule_version": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "additionalProperties": false
+    },
+    "frameworkEligibility": {
+      "type": "object",
+      "required": [
+        "framework",
+        "edition",
+        "status",
+        "basis_reference"
+      ],
+      "properties": {
+        "framework": {
+          "type": "string",
+          "enum": [
+            "WURI",
+            "THE",
+            "QS",
+            "UI_GREENMETRIC"
+          ]
+        },
+        "edition": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "not_assessed",
+            "eligible",
+            "ineligible",
+            "uncertain",
+            "requires_source_verification"
+          ]
+        },
+        "basis_reference": {
+          "type": "string"
+        },
+        "assessment_unit": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "additionalProperties": false
+    },
+    "studyStatus": {
+      "type": "object",
+      "properties": {
+        "population_membership": {
+          "type": "string",
+          "enum": [
+            "candidate",
+            "included",
+            "excluded",
+            "unresolved"
+          ]
+        },
+        "recruitment_eligibility": {
+          "type": "string",
+          "enum": [
+            "not_assessed",
+            "eligible",
+            "ineligible",
+            "uncertain"
+          ]
+        },
+        "authorization_status": {
+          "type": "string",
+          "enum": [
+            "not_requested",
+            "pending",
+            "verified",
+            "denied",
+            "unknown"
+          ]
+        },
+        "participation_status": {
+          "type": "string",
+          "enum": [
+            "not_contacted",
+            "invited",
+            "consented",
+            "participating",
+            "withdrawn",
+            "completed",
+            "not_applicable"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "decisionProvenance": {
+      "type": "object",
+      "required": [
+        "procedure_version",
+        "decision_log_entry_ids"
+      ],
+      "properties": {
+        "procedure_version": {
+          "type": "string"
+        },
+        "decision_log_entry_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewer": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "approval_reference": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

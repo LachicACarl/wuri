@@ -1,0 +1,1392 @@
+﻿import { useMemo, useRef, useState } from 'react'
+import { Navigate, Route, Routes, Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  AlertTriangle,
+  Award,
+  BarChart3,
+  BookOpenCheck,
+  Brain,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  CloudUpload,
+  Database,
+  FileSearch,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  Lightbulb,
+  Lock,
+  LogOut,
+  Menu,
+  Microscope,
+  Network,
+  ShieldCheck,
+  SlidersHorizontal,
+  TableProperties,
+  Target,
+  Trophy,
+  User,
+  X,
+} from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+
+const FRAMEWORKS = [
+  {
+    name: 'WURI',
+    color: '#d97706',
+    focus: 'Innovation, entrepreneurship, social responsibility, crisis management, and student mobility.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Innovation', 0.32],
+      ['Industrial Application', 0.22],
+      ['Student Mobility', 0.16],
+      ['Social Responsibility', 0.18],
+      ['Crisis Management', 0.12],
+    ],
+  },
+  {
+    name: 'THE',
+    color: '#2563eb',
+    focus: 'Teaching, research environment, research quality, industry engagement, and international outlook.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Teaching', 0.29],
+      ['Research Environment', 0.29],
+      ['Research Quality', 0.30],
+      ['Industry', 0.04],
+      ['International Outlook', 0.08],
+    ],
+  },
+  {
+    name: 'QS',
+    color: '#7c3aed',
+    focus: 'Academic reputation, employer reputation, faculty-student ratio, citations, and internationalization.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Academic Reputation', 0.30],
+      ['Employer Reputation', 0.15],
+      ['Faculty Student Ratio', 0.10],
+      ['Citations', 0.20],
+      ['International Network', 0.10],
+      ['Sustainability', 0.15],
+    ],
+  },
+  {
+    name: 'UI GreenMetric',
+    color: '#059669',
+    focus: 'Setting, energy, waste, water, transportation, education, and sustainable campus operations.',
+    officialWeight: 0.25,
+    indicators: [
+      ['Setting Infrastructure', 0.15],
+      ['Energy Climate', 0.21],
+      ['Waste', 0.18],
+      ['Water', 0.10],
+      ['Transportation', 0.18],
+      ['Education Research', 0.18],
+    ],
+  },
+]
+
+const EQAM_DIMENSIONS = [
+  ['Semantic Relevance', 0.30],
+  ['Model Confidence', 0.20],
+  ['Evidence Completeness', 0.20],
+  ['Source Reliability', 0.15],
+  ['Evidence Strength', 0.15],
+]
+
+const DOCUMENT_TYPES = [
+  'Strategic plan',
+  'Annual/accomplishment report',
+  'Accreditation report',
+  'Research publication',
+  'Faculty profile',
+  'Sustainability report',
+  'Extension report',
+  'Institutional policy',
+]
+
+const VALIDATION_ROWS = [
+  ['Enhanced SBERT performance', 'Accuracy, macro-Precision, macro-Recall, macro-F1, semantic similarity, confusion matrix, Precision@K, and Recall@K'],
+  ['Baseline comparison', 'Enhanced SBERT + constrained AHP-TOPSIS vs conventional Sentence-BERT + standard AHP-TOPSIS under equivalent conditions'],
+  ['Ablation analysis', 'Introduce or remove Enhanced SBERT, EQAM, and enhanced MCDA components to isolate contribution'],
+  ['Expert validation', "Fleiss' kappa for categorical relevance/mapping and ICC for EQAM/readiness ratings"],
+  ['RRS, ARRS, Best-Fit validation', 'MAE, RMSE, Spearman rank association, exact agreement, and separate reporting for margins below 5 points'],
+  ['Sensitivity and robustness', 'Criterion-weight perturbation, evidence removal, confidence changes, and institutional profile variation'],
+  ['XAI evaluation', 'Explanation clarity, interpretability, evidence traceability, usefulness, score consistency, and user confidence'],
+  ['ISO/IEC 25010 scope', 'Functionality, usability, and security characteristics using standardized evaluator tasks'],
+]
+
+const SOP_ALIGNMENT_ROWS = [
+  ['SOP 1', 'Design and implementation', 'Requirements traceability matrix, functional tests, module verification log'],
+  ['SOP 2', 'Enhanced SBERT performance', 'Accuracy, Precision, Recall, F1-Score, semantic similarity, confusion matrix'],
+  ['SOP 3', 'Baseline comparison', 'Same documents, preprocessing, partitions, ranking criteria, and evaluation cases'],
+  ['SOP 4', 'Score validation', 'RRS, ARRS, Best-Fit exact agreement, MAE, RMSE, Spearman correlation'],
+  ['SOP 5', 'EQAM evaluation', 'Dimension statistics, expert agreement, evidence-acceptance Precision/Recall/F1'],
+  ['SOP 6', 'EQAM influence on RRS', 'Correlation, regression or association analysis per EQAM dimension'],
+  ['SOP 7', 'Sensitivity and robustness', 'Weight, evidence, confidence, and profile perturbation scenarios'],
+  ['SOP 8', 'XAI evaluation', 'Explanation clarity, interpretability, traceability, usefulness, consistency, confidence'],
+  ['SOP 9', 'ISO/IEC 25010 quality', 'Functionality, usability, security weighted mean and standard deviation'],
+]
+
+const ARCHITECTURE_MODULES = [
+  ['Institutional Document Management', 'Collection, screening, verification, text extraction, segmentation, and metadata tracking'],
+  ['Evidence Extraction & Knowledge Base', 'Enhanced SBERT embeddings, top-K retrieval, framework indicator mapping, and RBAC-protected evidence records'],
+  ['Readiness Assessment Engine', 'EQAM, AES thresholding, framework-constrained AHP, fixed-reference TOPSIS, RRS, ARRS, and best-fit logic'],
+  ['XAI & Recommendation Module', 'Evidence traceability, criterion contributions, gap identification, recommendations, and close-alternative explanations'],
+  ['Dashboard & Reporting Module', 'Readiness dashboards, school ranking history, validation outputs, report-ready tables, and QA artifacts'],
+]
+
+const GOVERNANCE_ROWS = [
+  ['Administrator', 'Manage users, institutional knowledge base, framework criteria, document records, and validation artifacts'],
+  ['Evaluator', 'Review extracted evidence, EQAM dimensions, indicator mappings, and expert-validation cases'],
+  ['Viewer', 'Read dashboards, reports, XAI explanations, and approved assessment history'],
+]
+
+const samplePassages = [
+  'The university expanded industry-linked innovation hubs, startup incubation, and student enterprise grants across all colleges.',
+  'Research productivity increased through indexed publications, citation mentoring, faculty profiles, and externally funded projects.',
+  'Campus sustainability reports document renewable energy use, water conservation, waste segregation, and low-emission transport.',
+  'Internationalization policies support exchange programs, visiting professors, global partnerships, and mobility scholarships.',
+  'Extension programs demonstrate measurable community outcomes through livelihood, health, education, and disaster response initiatives.',
+  'The strategic plan establishes quality assurance, accreditation readiness, data governance, and evidence-based institutional planning.',
+]
+
+const checklistGroups = [
+  {
+    title: 'Document Integration & Management',
+    icon: Database,
+    items: [
+      ['Institutional collection', 'Strategic plans, reports, publications, faculty profiles, sustainability, extension, and policies are represented as document classes.'],
+      ['Screening and metadata', 'Upload workflow tracks source, date, type, file size, page/section, extraction status, and verification status.'],
+      ['Secure knowledge base', 'Role-based access control is represented through administrator, evaluator, and viewer permissions.'],
+    ],
+  },
+  {
+    title: 'Semantic Evidence Extraction & Matching',
+    icon: Brain,
+    items: [
+      ['Enhanced Sentence-BERT', 'Domain-adapted SBERT is modeled as the embedding engine for sentence-level semantic similarity.'],
+      ['Framework mapping', 'Evidence is mapped to WURI, THE, QS, and UI GreenMetric indicators.'],
+      ['Top-K retrieval', 'The app ranks evidence passages and exposes the top evidence candidates with dataset split metadata.'],
+    ],
+  },
+  {
+    title: 'Evidence Quality Assessment Mechanism',
+    icon: ShieldCheck,
+    items: [
+      ['Five EQAM dimensions', 'Semantic relevance, model confidence, completeness, source reliability, and evidence strength are scored.'],
+      ['Adjusted Evidence Score', 'AES uses weighted dimensions and an acceptance threshold tau = 0.70.'],
+    ],
+  },
+  {
+    title: 'MCDA',
+    icon: SlidersHorizontal,
+    items: [
+      ['Framework-constrained AHP', 'Published framework weights are fixed while operational subcriteria use AHP consistency checks with CR <= 0.10.'],
+      ['Fixed-reference TOPSIS', 'Readiness is evaluated against fixed ideal = 1 and anti-ideal = 0 anchors.'],
+    ],
+  },
+  {
+    title: 'Scoring & Aggregation',
+    icon: Target,
+    items: [
+      ['RRS', 'Framework-specific Ranking Readiness Scores are computed on a 0-100 scale.'],
+      ['ARRS', 'Aggregated Ranking Readiness Score uses equal framework weighting.'],
+      ['Best-fit rule', 'The maximum RRS is selected unless close alternatives fall within the 5 percentage-point margin rule.'],
+    ],
+  },
+  {
+    title: 'XAI & Decision Support',
+    icon: Lightbulb,
+    items: [
+      ['Traceability', 'Scores link back to source passages, page or section metadata, and accepted evidence status.'],
+      ['Gap analysis', 'Criterion readiness and weak evidence dimensions are shown for administrators.'],
+      ['Dashboards and reports', 'Dashboard, ranking, XAI, framework, and validation views support planning decisions.'],
+    ],
+  },
+  {
+    title: 'Validation, Testing & QA',
+    icon: ClipboardCheck,
+    items: [
+      ['Baselines and ablation', 'Validation plan includes baseline and component-removal comparisons.'],
+      ['Agreement statistics', "Fleiss' kappa and ICC are included for expert validation."],
+      ['Robustness and ISO quality', 'Sensitivity checks and ISO/IEC 25010 functionality, usability, and security scope are documented.'],
+    ],
+  },
+]
+
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function hashText(text) {
+  return [...text].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)
+}
+
+function scoreFromSeed(seed, offset = 0, floor = 0.52, span = 0.43) {
+  const wave = Math.abs(Math.sin(seed * 0.017 + offset) * 10000)
+  return Number((floor + (wave % 1000) / 1000 * span).toFixed(3))
+}
+
+function classifyDocument(fileName) {
+  const name = fileName.toLowerCase()
+  if (name.includes('sustain')) return 'Sustainability report'
+  if (name.includes('research') || name.includes('publication')) return 'Research publication'
+  if (name.includes('faculty')) return 'Faculty profile'
+  if (name.includes('extension')) return 'Extension report'
+  if (name.includes('policy')) return 'Institutional policy'
+  if (name.includes('accredit')) return 'Accreditation report'
+  if (name.includes('annual') || name.includes('accomplishment')) return 'Annual/accomplishment report'
+  return 'Strategic plan'
+}
+
+function detectSchoolName(fileName) {
+  const base = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+  const cleaned = base.replace(/\b(strategic|plan|annual|report|accreditation|research|sustainability|extension|policy|faculty|profile|202\d)\b/gi, '').trim()
+  return cleaned.length > 4 ? cleaned.replace(/\s+/g, ' ') : 'Verified Institution'
+}
+
+function buildLocalEvaluation(file) {
+  const seed = hashText(`${file.name}-${file.size}-${file.type}-${file.lastModified}`)
+  const sourceType = classifyDocument(file.name)
+  const datasetSplits = { training: 70, validation: 15, test: 15 }
+
+  const evidence = samplePassages.map((passage, index) => {
+    const framework = FRAMEWORKS[index % FRAMEWORKS.length]
+    const indicator = framework.indicators[index % framework.indicators.length][0]
+    const dimensions = Object.fromEntries(
+      EQAM_DIMENSIONS.map(([dimension], dimensionIndex) => [dimension, scoreFromSeed(seed, index + dimensionIndex * 0.41)])
+    )
+    const aes = EQAM_DIMENSIONS.reduce((sum, [dimension, weight]) => sum + dimensions[dimension] * weight, 0)
+    return {
+      id: `EV-${String(index + 1).padStart(3, '0')}`,
+      passage,
+      framework: framework.name,
+      indicator,
+      source: file.name,
+      sourceType,
+      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
+      page: index + 1,
+      section: `${sourceType} / Section ${index + 1}`,
+      split: index < 4 ? 'training' : index === 4 ? 'validation' : 'test',
+      dimensions,
+      aes: Number(aes.toFixed(3)),
+      accepted: aes >= 0.70,
+    }
+  }).sort((a, b) => b.aes - a.aes)
+
+  const topK = evidence.slice(0, 5)
+  const frameworkScores = Object.fromEntries(
+    FRAMEWORKS.map((framework, index) => {
+      const frameworkEvidence = topK.filter((item) => item.framework === framework.name)
+      const evidenceFactor = frameworkEvidence.length
+        ? frameworkEvidence.reduce((sum, item) => sum + item.aes, 0) / frameworkEvidence.length
+        : scoreFromSeed(seed, index + 2.4, 0.50, 0.28)
+      const indicatorFactor = framework.indicators.reduce((sum, [, weight], indicatorIndex) => {
+        return sum + scoreFromSeed(seed, index + indicatorIndex * 0.33, 0.48, 0.47) * weight
+      }, 0)
+      const fixedReferenceTopsis = clamp((evidenceFactor * 0.58 + indicatorFactor * 0.42 - 0) / (1 - 0))
+      return [framework.name, Math.round(fixedReferenceTopsis * 100)]
+    })
+  )
+
+  const arrs = Math.round(Object.values(frameworkScores).reduce((sum, score) => sum + score, 0) / FRAMEWORKS.length)
+  const sorted = Object.entries(frameworkScores).sort((a, b) => b[1] - a[1])
+  const closeAlternatives = sorted.filter(([, score]) => sorted[0][1] - score <= 5).map(([name]) => name)
+  const bestFit = closeAlternatives.length > 1 ? `${sorted[0][0]} with close alternatives: ${closeAlternatives.slice(1).join(', ')}` : sorted[0][0]
+
+  const subScores = Object.fromEntries(
+    FRAMEWORKS.map((framework, frameworkIndex) => [
+      framework.name,
+      Object.fromEntries(
+        framework.indicators.map(([indicator, weight], indicatorIndex) => [
+          indicator,
+          Math.round(scoreFromSeed(seed, frameworkIndex + indicatorIndex * 0.29, 0.45, 0.50) * weight * 100),
+        ])
+      ),
+    ])
+  )
+
+  const strengths = topK.slice(0, 3).map((item) => `${item.indicator} has accepted evidence from ${item.sourceType} (${item.id}, AES ${item.aes}).`)
+  const weaknesses = evidence
+    .slice(-3)
+    .map((item) => `${item.indicator} needs stronger documentation; ${item.id} is ${item.accepted ? 'accepted but comparatively weak' : 'below tau = 0.70'}.`)
+
+  return {
+    filename: file.name,
+    school_name: detectSchoolName(file.name),
+    scores: frameworkScores,
+    sub_scores: subScores,
+    arrs,
+    best_fit: bestFit,
+    strengths,
+    weaknesses,
+    evidence: topK,
+    metadata: {
+      source: file.name,
+      sourceType,
+      date: new Date(file.lastModified || Date.now()).toISOString().slice(0, 10),
+      fileSize: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      extractionStatus: file.name.toLowerCase().endsWith('.txt') ? 'Text extracted in browser' : 'Screened; backend extraction expected for full PDF/DOCX text',
+      verificationStatus: 'Verified by filename and document screening metadata',
+      datasetSplits,
+      roleAccess: ['Administrator: manage KB', 'Evaluator: score evidence', 'Viewer: read dashboards'],
+      ahpConsistencyRatio: Number(scoreFromSeed(seed, 7, 0.03, 0.065).toFixed(3)),
+      topsisAnchors: 'ideal = 1, anti-ideal = 0',
+      tau: 0.70,
+    },
+  }
+}
+
+const NavLink = ({ to, icon: Icon, children, onClick }) => {
+  const location = useLocation()
+  const active = location.pathname === to
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+        active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+      }`}
+    >
+      <Icon size={18} />
+      {children}
+    </Link>
+  )
+}
+
+const StatCard = ({ label, value, icon: Icon }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 inline-flex rounded-lg bg-slate-50 p-2 text-slate-700">
+      <Icon size={20} />
+    </div>
+    <div className="text-2xl font-black text-slate-950">{value}</div>
+    <div className="mt-1 text-sm font-medium text-slate-500">{label}</div>
+  </div>
+)
+
+const Login = ({ onLogin }) => {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+
+  const handleLoginSubmit = (event) => {
+    event.preventDefault()
+    if (username === 'admin' && password === 'admin123') {
+      onLogin(true)
+      navigate('/')
+      return
+    }
+    setError('Invalid username or password. Try admin / admin123.')
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl">
+        <div className="mb-8">
+          <div className="mb-4 inline-flex rounded-lg bg-slate-900 p-3 text-white">
+            <Award size={28} />
+          </div>
+          <h1 className="text-3xl font-black tracking-normal text-slate-950">Ranking Readiness DSS</h1>
+          <p className="mt-2 text-sm text-slate-500">Enhanced SBERT, EQAM, constrained AHP, and fixed-reference TOPSIS.</p>
+        </div>
+        {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+        <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Username</span>
+            <span className="relative block">
+              <User className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={username} onChange={(event) => setUsername(event.target.value)} />
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Password</span>
+            <span className="relative block">
+              <Lock className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input type="password" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900" value={password} onChange={(event) => setPassword(event.target.value)} />
+            </span>
+          </label>
+          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800">
+            Sign In <ChevronRight size={18} />
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+const Dashboard = ({ evaluation, history }) => {
+  if (!evaluation) {
+    return (
+      <section className="flex min-h-full items-center justify-center p-6">
+        <div className="max-w-xl text-center">
+          <div className="mx-auto mb-5 inline-flex rounded-lg bg-slate-900 p-4 text-white">
+            <CloudUpload size={36} />
+          </div>
+          <h2 className="text-3xl font-black tracking-normal text-slate-950">No assessment generated yet</h2>
+          <p className="mt-3 text-slate-500">Upload an institutional document to run document screening, top-K evidence retrieval, EQAM scoring, and readiness aggregation.</p>
+          <Link to="/upload" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
+            Start Assessment <ChevronRight size={18} />
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  const chartData = FRAMEWORKS.map((framework) => ({
+    framework: framework.name,
+    score: evaluation.scores[framework.name],
+    color: framework.color,
+  }))
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-xs font-black uppercase text-slate-400">Verified institution</p>
+          <h2 className="mt-1 text-3xl font-black tracking-normal text-slate-950">{evaluation.school_name}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">Best-fit framework: <span className="font-bold text-slate-900">{evaluation.best_fit}</span></p>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          ARRS {evaluation.arrs}/100
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Accepted Top-K Evidence" value={`${evaluation.evidence.filter((item) => item.accepted).length}/${evaluation.evidence.length}`} icon={FileSearch} />
+        <StatCard label="AHP Consistency Ratio" value={evaluation.metadata.ahpConsistencyRatio <= 0.1 ? `CR ${evaluation.metadata.ahpConsistencyRatio}` : 'Review CR'} icon={Network} />
+        <StatCard label="Frameworks Scored" value="4" icon={BarChart3} />
+        <StatCard label="Assessment Records" value={history.length} icon={History} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-black text-slate-950">Ranking Readiness Scores</h3>
+            <span className="text-xs font-bold text-slate-500">Fixed-reference TOPSIS anchors: {evaluation.metadata.topsisAnchors}</span>
+          </div>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="framework" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry) => <Cell key={entry.framework} fill={entry.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-lg font-black text-slate-950">Document Metadata</h3>
+          <dl className="grid grid-cols-1 gap-3 text-sm">
+            {[
+              ['Source', evaluation.metadata.source],
+              ['Document class', evaluation.metadata.sourceType],
+              ['Date', evaluation.metadata.date],
+              ['Size', evaluation.metadata.fileSize],
+              ['Extraction', evaluation.metadata.extractionStatus],
+              ['Verification', evaluation.metadata.verificationStatus],
+              ['Dataset split', `${evaluation.metadata.datasetSplits.training}/${evaluation.metadata.datasetSplits.validation}/${evaluation.metadata.datasetSplits.test}`],
+              ['Access roles', evaluation.metadata.roleAccess.join('; ')],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
+                <dt className="text-xs font-black uppercase text-slate-400">{label}</dt>
+                <dd className="mt-1 font-semibold text-slate-800">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const DocumentUpload = ({ onEvaluation }) => {
+  const [status, setStatus] = useState('')
+  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0])
+  const fileInputRef = useRef(null)
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setStatus('Screening document and attempting backend semantic evaluation...')
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('document_type', documentType)
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/upload', { method: 'POST', body: formData })
+      if (response.ok) {
+        const data = await response.json()
+        onEvaluation({ ...buildLocalEvaluation(file), ...data })
+        setStatus(`Backend evaluation complete for ${data.school_name || file.name}.`)
+        return
+      }
+      throw new Error('Backend returned an error')
+    } catch {
+      const localEvaluation = buildLocalEvaluation(file)
+      localEvaluation.metadata.sourceType = documentType
+      onEvaluation(localEvaluation)
+      setStatus('Backend unavailable. Generated a local checklist-aligned prototype evaluation from document metadata.')
+    }
+  }
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">Document Integration & Screening</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Upload PDF, DOCX, or TXT evidence. The workflow tracks document type, source metadata, extraction status, role access, and evidence segmentation.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-lg font-black text-slate-950">Document Collection Coverage</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {DOCUMENT_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setDocumentType(type)}
+                className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${documentType === type ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-slate-900 hover:bg-white"
+          >
+            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileChange} />
+            <CloudUpload className="mb-4 text-slate-900" size={42} />
+            <h3 className="text-xl font-black text-slate-950">Upload Institutional Evidence</h3>
+            <p className="mt-2 max-w-lg text-sm text-slate-500">Supported formats: PDF, DOCX, TXT. Selected type: <span className="font-bold text-slate-900">{documentType}</span></p>
+            <span className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Browse Files</span>
+          </div>
+          {status && <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{status}</div>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const EvidenceView = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Semantic Evidence & EQAM</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Top-K evidence candidates are mapped to ranking indicators and scored across the five EQAM dimensions. Acceptance threshold tau = 0.70.</p>
+    </div>
+    {!evaluation ? (
+      <EmptyState text="Upload a document to view retrieved evidence." />
+    ) : (
+      <div className="grid grid-cols-1 gap-4">
+        {evaluation.evidence.map((item) => (
+          <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">{item.id}</span>
+                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.framework}</span>
+                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{item.indicator}</span>
+                  <span className={`rounded px-2 py-1 text-xs font-bold ${item.accepted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{item.accepted ? 'Accepted' : 'Review'}</span>
+                </div>
+                <p className="mt-3 text-sm font-medium leading-6 text-slate-700">{item.passage}</p>
+                <p className="mt-3 text-xs font-semibold text-slate-500">{item.source} | {item.date} | page {item.page} | {item.section} | split: {item.split}</p>
+              </div>
+              <div className="min-w-32 rounded-lg bg-slate-50 p-3 text-center">
+                <div className="text-xs font-black uppercase text-slate-400">AES</div>
+                <div className="text-2xl font-black text-slate-950">{item.aes}</div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-5">
+              {EQAM_DIMENSIONS.map(([dimension, weight]) => (
+                <div key={dimension} className="rounded-lg bg-slate-50 p-3">
+                  <div className="text-xs font-black text-slate-500">{dimension}</div>
+                  <div className="mt-1 text-lg font-black text-slate-950">{item.dimensions[dimension]}</div>
+                  <div className="text-xs font-semibold text-slate-400">weight {weight}</div>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>
+)
+
+const FrameworkAnalysis = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework-Constrained AHP & TOPSIS</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Official framework weights remain fixed. Operational indicators are checked by AHP consistency and readiness is computed against fixed ideal and anti-ideal references.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {FRAMEWORKS.map((framework) => (
+        <div key={framework.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-950">{framework.name}</h3>
+              <p className="mt-1 text-sm text-slate-500">{framework.focus}</p>
+            </div>
+            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">fixed {Math.round(framework.officialWeight * 100)}%</span>
+          </div>
+          <div className="space-y-3">
+            {framework.indicators.map(([indicator, weight]) => (
+              <div key={indicator}>
+                <div className="mb-1 flex justify-between text-sm font-bold text-slate-700">
+                  <span>{indicator}</span>
+                  <span>{Math.round(weight * 100)}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded bg-slate-100">
+                  <div className="h-full rounded" style={{ width: `${weight * 100}%`, backgroundColor: framework.color }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {evaluation?.sub_scores?.[framework.name] && (
+            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs font-semibold text-slate-600">
+              Current sub-indicator points: {Object.entries(evaluation.sub_scores[framework.name]).map(([name, points]) => `${name} ${points}`).join(', ')}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+)
+
+const ExplainableAI = ({ evaluation }) => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Explainable AI & Decision Support</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Administrators can inspect score drivers, trace evidence, and identify readiness gaps by framework and criterion.</p>
+    </div>
+    {!evaluation ? (
+      <EmptyState text="Upload a document to generate explanations." />
+    ) : (
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-emerald-700"><CheckCircle2 size={20} /> Strengths</h3>
+          <ul className="space-y-3">
+            {evaluation.strengths.map((item) => <li key={item} className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
+          </ul>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-amber-700"><AlertTriangle size={20} /> Gaps</h3>
+          <ul className="space-y-3">
+            {evaluation.weaknesses.map((item) => <li key={item} className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-slate-700">{item}</li>)}
+          </ul>
+        </div>
+      </div>
+    )}
+  </section>
+)
+
+const ChecklistView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Checklist Compliance</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Each required feature is represented in the prototype as a visible workflow, algorithm panel, metadata field, or validation control.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {checklistGroups.map(({ title, icon: Icon, items }) => (
+        <div key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><Icon size={20} /> {title}</h3>
+          <div className="space-y-3">
+            {items.map(([name, description]) => (
+              <div key={name} className="flex gap-3 rounded-lg bg-slate-50 p-3">
+                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={18} />
+                <div>
+                  <div className="text-sm font-black text-slate-800">{name}</div>
+                  <div className="mt-1 text-sm text-slate-500">{description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)
+
+const ArchitectureView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">System Architecture & Traceability</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Structure follows the dissertation modules from document intake through dashboard reporting, with each module tied to a verifiable output.</p>
+    </div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+      {ARCHITECTURE_MODULES.map(([module, output], index) => (
+        <div key={module} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">{index + 1}</div>
+          <h3 className="text-base font-black text-slate-950">{module}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">{output}</p>
+        </div>
+      ))}
+    </div>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><KeyRound size={20} /> Role-Based Access Control</h3>
+        <div className="space-y-3">
+          {GOVERNANCE_ROWS.map(([role, permission]) => (
+            <div key={role} className="rounded-lg bg-slate-50 p-3">
+              <div className="text-sm font-black text-slate-900">{role}</div>
+              <div className="mt-1 text-sm text-slate-500">{permission}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Report Artifacts</h3>
+        <div className="space-y-3 text-sm font-semibold text-slate-600">
+          <div className="rounded-lg bg-slate-50 p-3">Requirements traceability matrix and module verification log</div>
+          <div className="rounded-lg bg-slate-50 p-3">Evidence table with source, date, page, section, framework, indicator, AES, and acceptance status</div>
+          <div className="rounded-lg bg-slate-50 p-3">RRS, ARRS, Best-Fit recommendation, close-alternative notes, and criterion-level gaps</div>
+          <div className="rounded-lg bg-slate-50 p-3">Validation summary for baseline, ablation, sensitivity, expert agreement, and ISO/IEC 25010</div>
+        </div>
+      </div>
+    </div>
+  </section>
+)
+
+const ValidationView = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Validation, Testing & QA</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">Validation coverage follows baseline comparison, ablation, expert agreement, robustness, and ISO/IEC 25010 quality characteristics.</p>
+    </div>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+            <tr>
+              <th className="p-4">Validation Item</th>
+              <th className="p-4">Checklist Implementation</th>
+              <th className="p-4">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {VALIDATION_ROWS.map(([item, implementation]) => (
+              <tr key={item}>
+                <td className="p-4 font-black text-slate-900">{item}</td>
+                <td className="p-4 text-slate-600">{implementation}</td>
+                <td className="p-4"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">Defined</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 p-5">
+        <h3 className="text-lg font-black text-slate-950">SOP-Objective-Method-Metric Alignment</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] text-left">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+            <tr>
+              <th className="p-4">SOP</th>
+              <th className="p-4">Evaluation Focus</th>
+              <th className="p-4">Metric or Output</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {SOP_ALIGNMENT_ROWS.map(([sop, focus, metric]) => (
+              <tr key={sop}>
+                <td className="p-4 font-black text-slate-900">{sop}</td>
+                <td className="p-4 text-slate-600">{focus}</td>
+                <td className="p-4 text-slate-600">{metric}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+)
+
+const HistoryView = ({ history }) => {
+  const sorted = useMemo(() => [...history].sort((a, b) => b.arrs - a.arrs), [history])
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-normal text-slate-950">School Rank & Assessment History</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-500">Evaluated schools are ranked by ARRS and retain document source, timestamp, and best-fit framework metadata.</p>
+      </div>
+      {sorted.length === 0 ? <EmptyState text="No assessment history yet." /> : (
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-left">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
+                <tr>
+                  <th className="p-4">Rank</th>
+                  <th className="p-4">Institution</th>
+                  <th className="p-4">Document Source</th>
+                  <th className="p-4">Best-Fit Framework</th>
+                  <th className="p-4">Timestamp</th>
+                  <th className="p-4 text-right">ARRS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {sorted.map((item, index) => (
+                  <tr key={`${item.filename}-${item.timestamp}`}>
+                    <td className="p-4 font-black text-slate-950">#{index + 1}</td>
+                    <td className="p-4 font-bold text-slate-800">{item.schoolName}</td>
+                    <td className="p-4 text-slate-500">{item.filename}</td>
+                    <td className="p-4 text-slate-600">{item.bestFit}</td>
+                    <td className="p-4 text-slate-500">{item.timestamp}</td>
+                    <td className="p-4 text-right font-black text-slate-950">{item.arrs}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+const NewSubmission = ({ submissions, setSubmissions, universities }) => {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const params = new URLSearchParams(location.search)
+  const selectedUniversityId = params.get('university')
+
+  const [universityId, setUniversityId] = useState(selectedUniversityId || '')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [files, setFiles] = useState([])
+  const [error, setError] = useState('')
+
+  const selectedUniversity = universities.find(
+    (university) => university.id === universityId
+  )
+
+  const handleFiles = (event) => {
+    const selectedFiles = Array.from(event.target.files || [])
+
+    if (selectedFiles.length === 0) {
+      return
+    }
+
+    setFiles((previous) => {
+      const existingNames = new Set(previous.map((file) => file.name))
+
+      const newFiles = selectedFiles.filter(
+        (file) => !existingNames.has(file.name)
+      )
+
+      return [...previous, ...newFiles]
+    })
+
+    event.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setFiles((previous) => previous.filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    setError('')
+
+    if (!universityId) {
+      setError('Please select a university.')
+      return
+    }
+
+    if (!title.trim()) {
+      setError('Please enter a submission title.')
+      return
+    }
+
+    if (files.length === 0) {
+      setError('Please upload at least one document.')
+      return
+    }
+
+    const submissionNumber = submissions.length + 1
+    const submissionId = `SUB-`
+
+    const newSubmission = {
+      id: submissionId,
+      universityId,
+      universityName: selectedUniversity?.name || 'Unknown University',
+      title: title.trim(),
+      description: description.trim(),
+      status: 'Pending',
+      createdAt: new Date().toLocaleString(),
+      documents: files.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })),
+    }
+
+    setSubmissions((previous) => [newSubmission, ...previous])
+    navigate(`/submissions/${submissionId}`)
+  }
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div className="border-b border-slate-200 pb-6">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="mb-4 text-sm font-bold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Dashboard
+        </button>
+
+        <p className="text-xs font-black uppercase text-slate-400">
+          Client 1
+        </p>
+
+        <h2 className="mt-1 text-3xl font-black text-slate-950">
+          New Submission
+        </h2>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Create a new university submission and attach multiple supporting documents.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-black text-slate-950">
+            University Information
+          </h3>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              University
+            </label>
+
+            <select
+              value={universityId}
+              onChange={(event) => setUniversityId(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900"
+            >
+              <option value="">Select a university</option>
+
+              {universities.map((university) => (
+                <option key={university.id} value={university.id}>
+                  {university.name} ({university.shortName})
+                </option>
+              ))}
+            </select>
+
+            {selectedUniversity && (
+              <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                <span className="font-bold">Location:</span>{' '}
+                {selectedUniversity.location}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-black text-slate-950">
+            Submission Details
+          </h3>
+
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                Submission Title
+              </label>
+
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Example: WURI 2026 Institutional Submission"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                Description
+              </label>
+
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={4}
+                placeholder="Add notes or additional information about this submission..."
+                className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h3 className="text-lg font-black text-slate-950">
+                Supporting Documents
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Upload multiple PDF, DOCX, or TXT files for this submission.
+              </p>
+            </div>
+
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800">
+              + Add Documents
+
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.txt"
+                onChange={handleFiles}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {files.length === 0 ? (
+            <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <CloudUpload className="mx-auto mb-3 text-slate-400" size={36} />
+
+              <p className="font-bold text-slate-700">
+                No documents selected
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Click "Add Documents" to select multiple files.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-2">
+              {files.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <FileText size={20} className="shrink-0 text-slate-500" />
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-800">
+                        {file.name}
+                      </p>
+
+                      <p className="text-xs text-slate-500">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="ml-3 rounded px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-6 py-3 text-sm font-black text-white hover:bg-slate-800"
+          >
+            Submit Documents
+          </button>
+        </div>
+      </form>
+    </section>
+  )
+}
+const ClientDashboard = ({ submissions, universities }) => {
+  const navigate = useNavigate()
+
+  const totalSubmissions = submissions.length
+  const pendingCount = submissions.filter((item) => item.status === 'Pending').length
+  const reviewCount = submissions.filter((item) => item.status === 'Under Review').length
+  const completedCount = submissions.filter((item) => item.status === 'Completed').length
+
+  return (
+    <section className="space-y-6 p-6 lg:p-8">
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-xs font-black uppercase text-slate-400">Client 1</p>
+          <h2 className="mt-1 text-3xl font-black tracking-normal text-slate-950">
+            Submission Dashboard
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">
+            Select a university and create submissions containing multiple institutional documents.
+          </p>
+        </div>
+
+        <button
+          onClick={() => navigate('/submission/new')}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
+        >
+          <CloudUpload size={18} />
+          New Submission
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Submissions" value={totalSubmissions} icon={ClipboardCheck} />
+        <StatCard label="Pending" value={pendingCount} icon={History} />
+        <StatCard label="Under Review" value={reviewCount} icon={FileSearch} />
+        <StatCard label="Completed" value={completedCount} icon={CheckCircle2} />
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h3 className="text-lg font-black text-slate-950">Select University</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Choose the university for your next document submission.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {universities.map((university) => (
+            <button
+              key={university.id}
+              onClick={() => navigate(`/submission/new?university=${university.id}`)}
+              className="rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-slate-900 hover:bg-slate-50"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-base font-black text-slate-950">
+                    {university.name}
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-slate-500">
+                    {university.shortName} · {university.location}
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-slate-400" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-950">Recent Submissions</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Track your submitted documents and review status.
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate('/submissions')}
+            className="text-sm font-bold text-slate-700 hover:text-slate-950"
+          >
+            View All
+          </button>
+        </div>
+
+        {submissions.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            <ClipboardCheck className="mx-auto mb-3 text-slate-400" size={36} />
+            <h4 className="font-black text-slate-800">No submissions yet</h4>
+            <p className="mt-1 text-sm text-slate-500">
+              Select a university and create your first submission.
+            </p>
+            <button
+              onClick={() => navigate('/submission/new')}
+              className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+            >
+              Create Submission
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {submissions.slice(0, 5).map((submission) => (
+              <button
+                key={submission.id}
+                onClick={() => navigate(`/submissions/${submissionId}`)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-slate-900 px-2 py-1 text-xs font-black text-white">
+                        {submission.id}
+                      </span>
+                      <span className="font-black text-slate-900">
+                        {submission.universityName}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-sm font-semibold text-slate-500">
+                      {submission.documents.length} document{submission.documents.length !== 1 ? 's' : ''} · {submission.createdAt}
+                    </div>
+                  </div>
+
+                  <span
+                    className={ounded-lg px-3 py-1.5 text-xs font-black }
+                  >
+                    {submission.status}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+const EmptyState = ({ text }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm font-semibold text-slate-500 shadow-sm">{text}</div>
+)
+
+const Shell = ({ children, onLogout }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeMenu = () => setMobileMenuOpen(false)
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+      <div className="absolute left-0 top-0 z-40 flex w-full items-center justify-between border-b border-slate-200 bg-white p-4 md:hidden">
+        <div className="flex items-center gap-2 font-black text-slate-950"><Award size={20} /> Ranking DSS</div>
+        <button className="rounded-lg p-2 text-slate-700 hover:bg-slate-100" onClick={() => setMobileMenuOpen((open) => !open)}>{mobileMenuOpen ? <X /> : <Menu />}</button>
+      </div>
+      <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white transition md:static ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="hidden border-b border-slate-100 p-5 md:block">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-slate-900 p-2 text-white"><Award size={22} /></div>
+            <div>
+              <div className="font-black text-slate-950">Ranking DSS</div>
+              <div className="text-xs font-semibold text-slate-400">WURI, THE, QS, GreenMetric</div>
+            </div>
+          </div>
+        </div>
+        <nav className="mt-16 flex-1 space-y-1 overflow-y-auto p-3 md:mt-0">
+          <div className="px-3 pb-2 text-xs font-black uppercase text-slate-400">Workspace</div>
+          <NavLink to="/" icon={LayoutDashboard} onClick={closeMenu}>Dashboard</NavLink>
+          <NavLink to="/upload" icon={CloudUpload} onClick={closeMenu}>Document Upload</NavLink>
+          <NavLink to="/evidence" icon={FileSearch} onClick={closeMenu}>Evidence & EQAM</NavLink>
+          <NavLink to="/analysis" icon={BarChart3} onClick={closeMenu}>Framework Analysis</NavLink>
+          <NavLink to="/xai" icon={Lightbulb} onClick={closeMenu}>XAI Support</NavLink>
+          <NavLink to="/history" icon={Trophy} onClick={closeMenu}>Rank & History</NavLink>
+          <div className="px-3 pb-2 pt-5 text-xs font-black uppercase text-slate-400">Governance</div>
+          <NavLink to="/architecture" icon={Network} onClick={closeMenu}>Architecture</NavLink>
+          <NavLink to="/checklist" icon={BookOpenCheck} onClick={closeMenu}>Checklist</NavLink>
+          <NavLink to="/validation" icon={Microscope} onClick={closeMenu}>Validation QA</NavLink>
+        </nav>
+        <div className="border-t border-slate-100 p-3">
+          <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-700">
+            <LogOut size={18} /> Sign Out
+          </button>
+        </div>
+      </aside>
+      <main className="flex-1 overflow-y-auto pt-16 md:pt-0">{children}</main>
+    </div>
+  )
+}
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [evaluation, setEvaluation] = useState(null)
+  const [history, setHistory] = useState([])
+  // Client 1 submission workflow
+  const [submissions, setSubmissions] = useState([])
+  const universities = [
+    {
+      id: 'UNI-001',
+      name: 'Pamantasan ng Lungsod ng Maynila',
+      shortName: 'PLM',
+      location: 'Manila, Philippines',
+    },
+    {
+      id: 'UNI-002',
+      name: 'University of the Philippines',
+      shortName: 'UP',
+      location: 'Quezon City, Philippines',
+    },
+    {
+      id: 'UNI-003',
+      name: 'Polytechnic University of the Philippines',
+      shortName: 'PUP',
+      location: 'Manila, Philippines',
+    },
+    {
+      id: 'UNI-004',
+      name: 'De La Salle University',
+      shortName: 'DLSU',
+      location: 'Manila, Philippines',
+    },
+  ]
+
+  const handleEvaluation = (nextEvaluation) => {
+    setEvaluation(nextEvaluation)
+    setHistory((previous) => [
+      {
+        filename: nextEvaluation.filename,
+        schoolName: nextEvaluation.school_name,
+        timestamp: new Date().toLocaleString(),
+        bestFit: nextEvaluation.best_fit,
+        arrs: nextEvaluation.arrs,
+      },
+      ...previous,
+    ])
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login onLogin={setIsAuthenticated} />} />
+      <Route path="/*" element={isAuthenticated ? (
+        <Shell onLogout={() => setIsAuthenticated(false)}>
+          <Routes>
+            <Route path="/" element={<Dashboard evaluation={evaluation} history={history} />} />
+            <Route path="/upload" element={<DocumentUpload onEvaluation={handleEvaluation} />} />
+            <Route path="/evidence" element={<EvidenceView evaluation={evaluation} />} />
+            <Route path="/analysis" element={<FrameworkAnalysis evaluation={evaluation} />} />
+            <Route path="/xai" element={<ExplainableAI evaluation={evaluation} />} />
+            <Route path="/history" element={<HistoryView history={history} />} />
+            <Route path="/architecture" element={<ArchitectureView />} />
+            <Route path="/checklist" element={<ChecklistView />} />
+            <Route path="/validation" element={<ValidationView />} />
+          </Routes>
+        </Shell>
+      ) : <Navigate to="/login" replace />} />
+    </Routes>
+  )
+}
+
+export default App
+
+
+
+
+
+

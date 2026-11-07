@@ -1,0 +1,107 @@
+{
+  "catalog_version": "phase-16b-proposed-v1",
+  "status": "proposed_not_approved",
+  "source_document_hashes": {
+    "WURI": null,
+    "THE": null,
+    "QS": null,
+    "UI GreenMetric": null
+  },
+  "frameworks": {
+    "WURI": {
+      "edition": "2026",
+      "official_name": "World University Rankings for Innovation 2026",
+      "verification_status": "partial_unverified",
+      "source_url": "https://www.wuri.world/",
+      "criteria": [
+        {"id": "A1", "name": "Student Support and Engagement", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A2", "name": "Student Mobility and Openness", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A3", "name": "Industrial Application", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A4", "name": "Entrepreneurial Culture & Eco System", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A5", "name": "Crisis Management", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A6", "name": "Ethics and Integrity", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A7", "name": "Future-Oriented Responses to Global Uncertainty and Geopolitical Risk", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "A8", "name": "SDG- and ESG-Based Responses to Past and Present Global Challenges", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B1", "name": "Visionary Leadership", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B2", "name": "Empowerment-Based Management", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B3", "name": "Digital and AI Transformation in Strategy and Management", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B4", "name": "Culture/Value", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B5", "name": "Funding for Sustainability", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B6", "name": "Infrastructure/Technologies", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B7", "name": "Cost-Benefit Management", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "B8", "name": "University Brand and Reputation", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C1", "name": "Representative Research Project", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C2", "name": "Interdisciplinary, Convergent, and Integrated Research", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C3", "name": "Curricular Innovation for Future-Readiness", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C4", "name": "AI-based Teaching and Learning Transformation", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C5", "name": "Social Impact through Knowledge Transfer", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C6", "name": "Inclusive Social Innovation for the Underserved", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C7", "name": "University-Based Entrepreneurial Projects", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"},
+        {"id": "C8", "name": "Financial Impact-Driven Tech Transfer", "hierarchy": "category", "official_weight": null, "scale_unit": "case-level program evaluation", "direction": "higher_is_better", "verification_status": "category_from_private_workbook"}
+      ],
+      "evaluation_dimensions": [
+        {"id": "innovativeness", "official_weight": null, "verification_status": "unverified"},
+        {"id": "implementability", "official_weight": null, "verification_status": "unverified"},
+        {"id": "impact", "official_weight": null, "verification_status": "unverified"}
+      ]
+    },
+    "THE": {
+      "edition": "2026",
+      "official_name": "THE World University Rankings 2026",
+      "verification_status": "weights_verified_criteria_catalog_proposed",
+      "source_url": "https://www.timeshighereducation.com/world-university-rankings/methodology-world-university-rankings-2026",
+      "criteria": [
+        {"id": "teaching_reputation", "name": "Teaching reputation", "hierarchy": "Teaching", "official_weight": 0.15, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "staff_student_ratio", "name": "Staff-to-student ratio", "hierarchy": "Teaching", "official_weight": 0.045, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "doctorate_bachelor_ratio", "name": "Doctorate-to-bachelor ratio", "hierarchy": "Teaching", "official_weight": 0.0225, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "doctorates_awarded", "name": "Doctorates awarded to academic staff", "hierarchy": "Teaching", "official_weight": 0.06, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "institutional_income", "name": "Institutional income", "hierarchy": "Teaching", "official_weight": 0.0225, "scale_unit": "provider-normalized currency measure", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_reputation", "name": "Research reputation", "hierarchy": "Research Environment", "official_weight": 0.18, "scale_unit": "survey/provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_income", "name": "Research income", "hierarchy": "Research Environment", "official_weight": 0.0525, "scale_unit": "provider-normalized measure", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_productivity", "name": "Research productivity", "hierarchy": "Research Environment", "official_weight": 0.0525, "scale_unit": "publication volume", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "citation_impact", "name": "Citation impact", "hierarchy": "Research Quality", "official_weight": 0.15, "scale_unit": "bibliometric/provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_strength", "name": "Research strength", "hierarchy": "Research Quality", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_excellence", "name": "Research excellence", "hierarchy": "Research Quality", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "research_influence", "name": "Research influence", "hierarchy": "Research Quality", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_staff", "name": "International staff", "hierarchy": "International Outlook", "official_weight": 0.025, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_students", "name": "International students", "hierarchy": "International Outlook", "official_weight": 0.025, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_collaboration", "name": "International collaboration", "hierarchy": "International Outlook", "official_weight": 0.025, "scale_unit": "bibliometric/provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "study_abroad", "name": "Study abroad", "hierarchy": "International Outlook", "official_weight": 0.0, "scale_unit": "reported metric", "direction": "higher_is_better", "verification_status": "reported_not_scored"},
+        {"id": "industry_income", "name": "Industry income", "hierarchy": "Industry", "official_weight": 0.02, "scale_unit": "provider-normalized currency measure", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "patents", "name": "Patents", "hierarchy": "Industry", "official_weight": 0.02, "scale_unit": "patent measure", "direction": "higher_is_better", "verification_status": "published_weight"}
+      ]
+    },
+    "QS": {
+      "edition": "2026",
+      "official_name": "QS World University Rankings 2026",
+      "verification_status": "weights_verified_criteria_catalog_proposed",
+      "source_url": "https://www.topuniversities.com/world-university-rankings/methodology",
+      "criteria": [
+        {"id": "academic_reputation", "name": "Academic Reputation", "hierarchy": "Research and Discovery", "official_weight": 0.30, "scale_unit": "survey/provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "citations_per_faculty", "name": "Citations per Faculty", "hierarchy": "Research and Discovery", "official_weight": 0.20, "scale_unit": "bibliometric ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "employer_reputation", "name": "Employer Reputation", "hierarchy": "Employability and Outcomes", "official_weight": 0.15, "scale_unit": "survey/provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "employment_outcomes", "name": "Employment Outcomes", "hierarchy": "Employability and Outcomes", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "faculty_student_ratio", "name": "Faculty/Student Ratio", "hierarchy": "Learning Experience", "official_weight": 0.10, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_faculty_ratio", "name": "International Faculty Ratio", "hierarchy": "Global Engagement", "official_weight": 0.05, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_research_network", "name": "International Research Network", "hierarchy": "Global Engagement", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_student_ratio", "name": "International Student Ratio", "hierarchy": "Global Engagement", "official_weight": 0.05, "scale_unit": "ratio", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "sustainability", "name": "Sustainability", "hierarchy": "Sustainability", "official_weight": 0.05, "scale_unit": "provider-normalized score", "direction": "higher_is_better", "verification_status": "published_weight"},
+        {"id": "international_student_diversity", "name": "International Student Diversity", "hierarchy": "reported metric", "official_weight": 0.0, "scale_unit": "reported metric", "direction": "higher_is_better", "verification_status": "published_zero_weight"}
+      ]
+    },
+    "UI GreenMetric": {
+      "edition": "2025",
+      "official_name": "UI GreenMetric World University Rankings 2025",
+      "verification_status": "unverified_incomplete_source",
+      "source_url": "https://uigreenmetric.com/resources/university/guidelines",
+      "criteria": [
+        {"id": "SI", "name": "Setting and Infrastructure", "hierarchy": "category", "official_weight": 0.15, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"},
+        {"id": "EC", "name": "Energy and Climate Change", "hierarchy": "category", "official_weight": 0.21, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"},
+        {"id": "WS", "name": "Waste", "hierarchy": "category", "official_weight": 0.18, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"},
+        {"id": "WR", "name": "Water", "hierarchy": "category", "official_weight": 0.10, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"},
+        {"id": "TR", "name": "Transportation", "hierarchy": "category", "official_weight": 0.18, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"},
+        {"id": "ED", "name": "Education and Research", "hierarchy": "category", "official_weight": 0.18, "scale_unit": "guideline points", "direction": "higher_is_better", "verification_status": "reference_weight_not_source_verified"}
+      ]
+    }
+  }
+}
