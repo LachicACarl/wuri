@@ -26,7 +26,8 @@ def _apply_limits() -> bool:
 
 
 def main() -> int:
-    if not _apply_limits():
+    limits_applied = _apply_limits()
+    if os.name == "posix" and not limits_applied:
         sys.stdout.write(json.dumps({
             "error_type": "WorkerLimitsUnavailable",
             "error": "Parser worker resource limits are unavailable.",
@@ -47,7 +48,10 @@ def main() -> int:
         from app.document_processing import extract_blocks
 
         blocks = extract_blocks(filename, content)
-        sys.stdout.write(json.dumps({"blocks": [asdict(block) for block in blocks]}))
+        sys.stdout.write(json.dumps({
+            "blocks": [asdict(block) for block in blocks],
+            "resource_limits_applied": limits_applied,
+        }))
         return 0
     except ValueError as error:
         sys.stdout.write(json.dumps({
