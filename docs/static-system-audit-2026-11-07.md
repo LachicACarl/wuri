@@ -8,7 +8,7 @@
 
 ## Executive finding
 
-The inspected clean-root branch contains a minimal React/Vite frontend that renders a security-hold notice on every route. It contains no backend, API handler, authentication service, Supabase client, database migrations, document upload, extraction pipeline, assessment algorithms, or automated tests. It is intentionally non-operational.
+The inspected clean-root branch contains a standalone static HTML/CSS security-hold page in `index.html`. A React component and Vite configuration are tracked, but no `src/main.jsx` entrypoint exists and `index.html` contains no module script; the React component is therefore not mounted or loaded. It contains no backend, API handler, authentication service, Supabase client, database migrations, document upload, extraction pipeline, assessment algorithms, or automated tests. It is intentionally non-operational.
 
 The earlier audit findings below describe the pre-quarantine prototype and must not be read as current source findings. The historical main commit and suspicious configuration require independent investigation; the clean-root snapshot is a separate orphan-lineage review candidate, not security-cleared code.
 
@@ -16,7 +16,7 @@ The earlier audit findings below describe the pre-quarantine prototype and must 
 
 | Area | Current finding |
 |---|---|
-| App entry | React 18 / JSX, React Router |
+| Active page entry | Standalone `index.html` static HTML/CSS; no module script or React mount |
 | Build/tooling config | Vite with React and Tailwind plugins |
 | Styles | Tailwind CSS import and global CSS |
 | Frontend authentication | Not implemented |
@@ -42,16 +42,16 @@ Those components and associated upload/result logic were subsequently removed fr
 
 ## Repository entrypoint and static-hosting boundary
 
-The HTML entry `university-ranking-dss/index.html` loads `/src/main.jsx` and references `/favicon.svg`. The tracked favicon exists at `university-ranking-dss/public/favicon.svg`, which matches Vite's public-directory convention by source layout. This is a static path/layout observation only; the path has not been checked by a Vite build or browser request. The favicon artwork is still the Vite starter-style purple/blue mark and is not WURI institutional branding; it is cosmetic cleanup, not a security blocker.
+The tracked `university-ranking-dss/index.html` contains the security-hold markup and inline CSS only. It does not load `/src/main.jsx`, and that file is absent from the tracked tree. It also contains no favicon link, so the tracked `public/favicon.svg` is currently unreferenced. The React component in `src/App.jsx` is not active. These are static tree/content observations; no build or browser request was performed.
 
 The HTML contains `noindex, nofollow`, but this metadata is not an access-control boundary. The security-hold page must not be treated as private or as protection for confidential content; no confidential content should be hosted in this snapshot.
 
 ## Current static security observations
 
-1. Current `src/App.jsx` renders only the hold notice.
-2. Current `src/main.jsx` mounts React, React Router, and `src/index.css`.
+1. Current `index.html` directly renders the hold notice using static HTML and inline CSS.
+2. `src/main.jsx` is absent; `src/App.jsx` is not mounted or loaded by the HTML entry.
 3. Current `vite.config.js` contains declarative React and Tailwind plugins; no previously identified dynamic code-loader pattern is present in this branch's current file.
-4. Current source has no upload endpoint call, file input, FormData, authentication state, Supabase client, score result model, or assessment calculation.
+4. The active HTML page and tracked React component contain no upload endpoint call, file input, FormData, authentication state, Supabase client, score result model, or assessment calculation.
 5. `index.html` includes the WURI security-hold title, description, and noindex directive.
 6. The package manifest declares React/Vite/Tailwind/Router/icon dependencies, but without a lockfile these are not reproducibly resolved or verified.
 7. `src/assets/hero.png` remains in the tree but is not referenced by the current hold-page source; no decision to permanently remove the binary asset is implied.
@@ -75,7 +75,7 @@ The HTML contains `noindex, nofollow`, but this metadata is not an access-contro
 ## Checks performed
 
 - Inspected the current recursive tree and application/config/documentation source.
-- Checked app entry imports, HTML entrypoint references, favicon reference, Vite plugin configuration, package scripts, and package dependency declarations.
+- Checked the tracked HTML page, absence of a React entry module, absence of a module-script reference and favicon link, Vite plugin configuration, package scripts, and package dependency declarations.
 - Checked current UI for upload, auth, Supabase, score/result, and dormant prototype constructs.
 - Checked documentation against current source and corrected stale historical language.
 - Confirmed current branch remains separate from `main`.
