@@ -138,6 +138,19 @@ class ResearchApiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 503)
 
+    def test_login_rejects_overlong_username_and_password_before_authentication(self):
+        too_long_username = self.client.post(
+            "/api/auth/login",
+            json={"username": "u" * 255, "password": "local-test-password-long"},
+        )
+        self.assertEqual(too_long_username.status_code, 422)
+
+        too_long_password = self.client.post(
+            "/api/auth/login",
+            json={"username": "research-admin", "password": "p" * 1025},
+        )
+        self.assertEqual(too_long_password.status_code, 422)
+
     def test_session_cookie_is_secure_by_default_and_local_override_is_explicit(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertTrue(main.session_cookie_secure())
