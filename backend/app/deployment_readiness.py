@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import shutil
 import sqlite3
@@ -83,13 +85,39 @@ def build_readiness_report() -> dict[str, Any]:
         "ingress_body_limit", "manual_verification_required",
         "Reverse-proxy or hosting ingress request-body limits must be configured and verified separately.",
     ))
-    parser_limits_ready = os.name == "posix"
+    parser_limits_ready = False
+    parser_limit_detail = (
+        "This platform needs an equivalent worker CPU and memory sandbox before production use."
+    )
+    if os.name == "posix":
+        try:
+            probe = subprocess.run(
+                [sys.executable, "-m", "app.document_parser_worker", "readiness.txt"],
+                input=b"readiness probe",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                cwd=Path(__file__).resolve().parents[1],
+                timeout=10,
+                check=False,
+            )
+            worker_result = json.loads(probe.stdout.decode("utf-8"))
+            parser_limits_ready = (
+                probe.returncode == 0
+                and worker_result.get("resource_limits_applied") is True
+            )
+            parser_limit_detail = (
+                "A POSIX parser worker applied CPU, address-space, file-descriptor, and core-dump limits."
+                if parser_limits_ready else
+                "The parser worker did not confirm that all resource limits were applied."
+            )
+        except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError, json.JSONDecodeError):
+            parser_limit_detail = (
+                "The parser worker could not be started and verified during readiness checking."
+            )
     checks.append(_check(
         "parser_worker_resource_limits",
         "ready" if parser_limits_ready else "blocked",
-        "Parser workers apply CPU, address-space, file-descriptor, and core-dump limits."
-        if parser_limits_ready else
-        "This platform needs an equivalent worker CPU and memory sandbox before production use.",
+        parser_limit_detail,
     ))
     checks.append(_check(
         "parser_worker_container_isolation", "manual_verification_required",
