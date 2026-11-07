@@ -17,7 +17,7 @@ Install/build/test commands are intentionally not documented as approved executi
 **HOLD — NO-GO.** This recovery branch is an isolated remediation candidate, not a security-cleared or production-ready branch.
 
 - The suspicious obfuscated code was removed from the current recovery branch's Vite configuration. The original commit and `main` history remain preserved for investigation.
-- The tracked root `node_modules/` directory was removed from the current recovery branch tree. Dependencies must be reviewed and restored only from the committed lockfiles after explicit authorization.
+- The tracked root `node_modules/` directory was removed from the current recovery branch tree. Dependencies must be independently reviewed and a lockfile regenerated only after explicit authorization.
 - A root `.gitignore` excludes dependency directories, build output, local environment files, and logs.
 - The current `src/App.jsx` contains only a static security-hold screen. It has no upload control, API request, result renderer, session state, scoring constants, or Supabase client.
 - Do not use this snapshot to upload documents or enter credentials. Authentication and all operational features are unavailable.
@@ -35,11 +35,11 @@ A backend response is not automatically valid research output merely because it 
 
 ## Proposed backend design artifacts
 
-The following documents define reviewable designs only; none is implemented or approved for execution:
+The following documents are proposals and review artifacts only. They are not deployed API specifications, migrations, or implemented backend features:
 
 - `docs/authentication-contract-proposed.md` — server-side identity, sessions, authorization, and browser protections.
 - `docs/database-schema-proposed.md` — logical PostgreSQL entities, tenant boundaries, provenance, and access matrix.
-- `docs/assessment-api-contract-proposed.md` — current frontend upload-response expectations and failure behavior.
+- `docs/assessment-api-contract-proposed.md` — proposed future assessment API contract; no corresponding endpoint is implemented.
 - `docs/backend-implementation-plan.md` — dependency-ordered backend workstreams and authorization gates.
 - `docs/security-hold-clearance-evidence-checklist.md` — external evidence required to reconsider the security hold.
 
@@ -60,3 +60,8 @@ Until written security clearance and separate implementation/runtime authorizati
 3. Independent review of the remaining dependency manifests and lockfiles.
 4. Approved server-side authentication and assessment API contracts.
 5. Separate written authorization for implementation, isolated synthetic-data testing, real-data work, and production deployment.
+
+
+## Current implementation boundary
+
+Only the static React security-hold screen is present in this branch. The proposal documents describe future work and must not be treated as implemented services. The frontend contains no live backend, login, upload, scoring, or Supabase operations. This branch is not approved for production use.
