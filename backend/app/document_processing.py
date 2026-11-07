@@ -3,6 +3,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import zipfile
+import zlib
 from typing import Iterable
 
 import docx
@@ -125,6 +126,8 @@ def _validate_docx_archive(content: bytes) -> None:
                         raise ValueError("DOCX package entry exceeds its declared size.")
     except zipfile.BadZipFile as error:
         raise ValueError("The DOCX package is not a valid ZIP archive.") from error
+    except (OSError, RuntimeError, EOFError, zlib.error) as error:
+        raise ValueError("The DOCX package is malformed or unreadable.") from error
 
 
 def validate_content(filename: str, content: bytes) -> None:
@@ -138,7 +141,10 @@ def validate_content(filename: str, content: bytes) -> None:
                     raise ValueError("PDF exceeds the maximum page count.")
                 if document.is_encrypted:
                     raise ValueError("Password-protected PDF files are not supported.")
-        except (fitz.FileDataError, fitz.EmptyFileError) as error:
+        except ValueError:
+            raise
+        except Exception as error:
+            # MuPDF parser exceptions vary across supported PyMuPDF releases.
             raise ValueError("The PDF file is malformed or unreadable.") from error
     elif extension == ".docx":
         if not content.startswith(b"PK"):
