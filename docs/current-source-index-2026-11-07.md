@@ -26,6 +26,8 @@ This branch contains a quarantined JavaScript/React frontend only. There is no s
 - [Proposed authentication contract](authentication-contract-proposed.md)
 - [Proposed database schema](database-schema-proposed.md)
 
+All four backend design artifacts are unapproved proposals. In particular, the assessment API’s asynchronous `202` acceptance pattern is illustrative; session policy, idempotency scope, record state machines, identity mapping, completed-result schema, scoring formulas, and retention rules remain open decisions.
+
 ## What has not been verified
 
 No JavaScript parse/compile, dependency install, lockfile generation, dependency advisory scan, ESLint, Vite build, browser test, unit/integration/E2E test, GitHub Actions, Supabase inspection, migration, or deployment has been performed.
