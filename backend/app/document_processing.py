@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import zipfile
 from typing import Iterable
@@ -81,9 +81,11 @@ def _validate_docx_archive(content: bytes) -> None:
             for entry in entries:
                 name = entry.filename
                 path = PurePosixPath(name)
+                windows_path = PureWindowsPath(name)
                 if (
                     not name or name.startswith(("/", "\\\\"))
                     or "\\\\" in name or path.is_absolute()
+                    or windows_path.is_absolute() or windows_path.drive
                     or any(part in {"", ".", ".."} for part in path.parts)
                 ):
                     raise ValueError("DOCX package contains an unsafe archive path.")
