@@ -129,17 +129,17 @@ const SOP_ALIGNMENT_ROWS = [
 ]
 
 const ARCHITECTURE_MODULES = [
-  ['Institutional Document Management', 'Collection, screening, verification, text extraction, segmentation, and metadata tracking'],
-  ['Evidence Extraction & Knowledge Base', 'Enhanced SBERT embeddings, top-K retrieval, framework indicator mapping, and RBAC-protected evidence records'],
-  ['Readiness Assessment Engine', 'EQAM, AES thresholding, framework-constrained AHP, fixed-reference TOPSIS, RRS, ARRS, and best-fit logic'],
-  ['XAI & Recommendation Module', 'Evidence traceability, criterion contributions, gap identification, recommendations, and close-alternative explanations'],
-  ['Dashboard & Reporting Module', 'Readiness dashboards, school ranking history, validation outputs, report-ready tables, and QA artifacts'],
+  ['Institutional Document Management', 'PLANNED — collection, screening, verification, extraction, segmentation and metadata tracking are not implemented'],
+  ['Evidence Extraction & Knowledge Base', 'PLANNED — no embedding model, top-K retrieval, indicator mapper, knowledge base or enforced RBAC is implemented'],
+  ['Readiness Assessment Engine', 'PLANNED — no EQAM, AES, AHP, TOPSIS, RRS, ARRS or best-fit calculation engine is implemented'],
+  ['XAI & Recommendation Module', 'PLANNED — explanation generation and evidence-linked recommendations are not implemented'],
+  ['Dashboard & Reporting Module', 'PLANNED — no persistent assessment history, ranking reports or QA artifacts are connected'],
 ]
 
 const GOVERNANCE_ROWS = [
-  ['Administrator', 'Manage users, institutional knowledge base, framework criteria, document records, and validation artifacts'],
-  ['Evaluator', 'Review extracted evidence, EQAM dimensions, indicator mappings, and expert-validation cases'],
-  ['Viewer', 'Read dashboards, reports, XAI explanations, and approved assessment history'],
+  ['Administrator', 'PROPOSED ONLY — these permissions are not implemented or enforced'],
+  ['Evaluator', 'PROPOSED ONLY — evidence review and validation permissions are not implemented or enforced'],
+  ['Viewer', 'PROPOSED ONLY — protected reports and assessment history are not connected'],
 ]
 
 
@@ -493,7 +493,7 @@ const ArchitectureView = () => (
         </div>
       </div>
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Planned Report Artifacts</h3>
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Planned Report Artifacts — Not Generated</h3>
         <div className="space-y-3 text-sm font-semibold text-slate-600">
           <div className="rounded-lg bg-slate-50 p-3">Requirements traceability matrix and module verification log</div>
           <div className="rounded-lg bg-slate-50 p-3">Evidence table with source, date, page, section, framework, indicator, AES, and acceptance status</div>
