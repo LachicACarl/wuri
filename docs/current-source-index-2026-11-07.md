@@ -1,6 +1,7 @@
 # WURI current source and verification index
 
-**Branch:** `security/clean-root-quarantine-2026-11-07`
+**Branch:** `security/clean-root-quarantine-2026-11-07`  
+**Review model:** moving branch reference; reviewers must record the live commit SHA they actually inspect.
 
 ## Current application source
 
@@ -27,6 +28,10 @@ This branch contains a quarantined JavaScript/React frontend only. There is no s
 - [Proposed database schema](database-schema-proposed.md)
 
 All four backend design artifacts are unapproved proposals. In particular, the assessment API’s asynchronous `202` acceptance pattern is illustrative; session policy, idempotency scope, record state machines, identity mapping, completed-result schema, scoring formulas, and retention rules remain open decisions.
+
+## Review cautions
+
+The project-specific Supabase status recorded in older issue/runbook notes is historical context, not a current provider verification. Do not infer that the project is active, connected, rotated, or safe from this repository snapshot. The API, authentication, database, and backend documents are proposals and not approved specifications.
 
 ## What has not been verified
 
