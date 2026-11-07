@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from app.deployment_readiness import build_readiness_report
+from app.cors_config import configured_cors_origins
 
 
 class DeploymentReadinessTests(unittest.TestCase):
@@ -26,6 +27,40 @@ class DeploymentReadinessTests(unittest.TestCase):
         self.assertIn(checks["parser_worker_resource_limits"], {"ready", "blocked"})
         self.assertEqual(checks["parser_worker_container_isolation"], "manual_verification_required")
         self.assertEqual(report["intake_gate"], "blocked")
+
+    def test_cors_origin_configuration_uses_allowlist_and_blocks_production_default(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                configured_cors_origins(),
+                [
+                    "http://localhost:5173",
+                    "http://localhost:5174",
+                    "http://127.0.0.1:5173",
+                    "http://127.0.0.1:5174",
+                ],
+            )
+        with patch.dict(os.environ, {"WURI_ENVIRONMENT": "production"}, clear=True):
+            self.assertEqual(configured_cors_origins(), [])
+        with patch.dict(
+            os.environ,
+            {
+                "WURI_ENVIRONMENT": "production",
+                "WURI_CORS_ORIGINS": "https://wuri.example, https://admin.wuri.example",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                configured_cors_origins(),
+                ["https://wuri.example", "https://admin.wuri.example"],
+            )
+
+    def test_cors_configuration_rejects_wildcards_and_non_origin_urls(self):
+        for value in ("*", "https://trusted.example/path", "javascript://trusted.example"):
+            with self.subTest(origin=value), patch.dict(
+                os.environ, {"WURI_CORS_ORIGINS": value}, clear=True
+            ):
+                with self.assertRaises(ValueError):
+                    configured_cors_origins()
 
     def test_default_report_blocks_without_scanner_and_does_not_expose_paths(self):
         with tempfile.TemporaryDirectory() as directory:
