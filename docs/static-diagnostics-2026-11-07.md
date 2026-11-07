@@ -6,7 +6,7 @@
 
 ## Executive result
 
-The current branch is a quarantined React/Vite frontend snapshot. The application intentionally renders a security-hold screen. It is not safe or authorized to run project commands or connect to external services yet.
+The current branch is a quarantined React/Vite frontend snapshot. The application intentionally renders a security-hold screen. The initial audit report described the older prototype in parts; this report is the current-state source inventory.
 
 ## Confirmed source-level findings
 
@@ -26,7 +26,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 
 ## Checks performed in this review
 
-- Re-read all tracked source/config/documentation files in the current tree.
+- Re-read the tracked application source/configuration files and relevant review documentation in the current tree. Some binary assets were identified by tree metadata only.
 - Confirmed the app entry imports React, React DOM, React Router, and the global CSS file.
 - Confirmed the Vite config contains the standard React and Tailwind plugins, without the previously observed dynamic code-loader pattern in this branch's current Vite config.
 - Confirmed there is no TypeScript source, Python source, backend directory, Supabase client import, upload handler, file input, or score computation in the current app source.
