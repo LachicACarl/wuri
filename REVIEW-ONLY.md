@@ -2,8 +2,12 @@
 
 **Review status:** Draft / review only  
 **Snapshot branch:** `security/clean-root-quarantine-2026-11-07`  
-**Snapshot commit:** `ff22bb0f5d73d5d62402f2d4c66eab957513e698`  
+**Snapshot branch:** `security/clean-root-quarantine-2026-11-07` (review the live branch head; do not rely on a pinned historical SHA in this handoff)  
 **Main branch:** must remain unchanged pending security clearance.
+
+## PR scope warning
+
+This PR changes **only this `REVIEW-ONLY.md` file**. It does not carry the clean-root source snapshot or its remediation commits as a PR diff. The snapshot is a separate orphan-lineage branch and must be reviewed directly using the branch tree and its source index. This PR is not a complete code-review bundle and is not mergeable into `main` by intent.
 
 ## Review entry points
 
@@ -20,7 +24,7 @@
 
 ## Current source state
 
-The snapshot contains a non-operational React/JavaScript frontend security-hold screen. It has no implemented backend, authentication, upload, private storage, document extraction, Supabase integration, assessment algorithms, or persistent history.
+The clean-root branch currently contains a non-operational React/JavaScript frontend security-hold screen. It has no implemented backend, authentication, upload, private storage, document extraction, Supabase integration, assessment algorithms, or persistent history.
 
 The proposed backend/auth/database files are design artifacts only. The dependency lockfile is absent; no dependency installation, build, lint, test, or runtime validation has been performed.
 
