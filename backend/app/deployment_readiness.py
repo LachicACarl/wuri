@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any
 
 from .malware_scanning import scanner_configuration_status
+from .cors_config import configured_cors_origins
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
@@ -46,6 +47,25 @@ def build_readiness_report() -> dict[str, Any]:
         ))
     except Exception:
         checks.append(_check("secure_session_cookies", "blocked", "Cookie security configuration is invalid."))
+
+    try:
+        origins = configured_cors_origins()
+        environment = os.getenv("WURI_ENVIRONMENT", "development").strip().lower()
+        cors_ready = bool(origins)
+        cors_detail = (
+            f"{len(origins)} exact browser origin(s) are allowlisted."
+            if cors_ready else
+            "No browser origins are configured; set WURI_CORS_ORIGINS for this environment."
+        )
+        if environment in {"production", "prod", "staging"} and not os.getenv("WURI_CORS_ORIGINS", "").strip():
+            cors_ready = False
+            cors_detail = "Production and staging require explicit WURI_CORS_ORIGINS."
+        checks.append(_check("cors_origins", "ready" if cors_ready else "blocked", cors_detail))
+    except ValueError:
+        checks.append(_check(
+            "cors_origins", "blocked",
+            "WURI_CORS_ORIGINS contains an invalid or unsafe origin.",
+        ))
 
     database_path = Path(os.getenv("WURI_DATABASE_PATH") or Path(__file__).resolve().parents[1] / "data" / "wuri.sqlite3")
     try:
