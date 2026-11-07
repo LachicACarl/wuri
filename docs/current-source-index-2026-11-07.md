@@ -38,3 +38,12 @@ The project-specific Supabase status recorded in older issue/runbook notes is hi
 No JavaScript parse/compile, dependency install, lockfile generation, dependency advisory scan, ESLint, Vite build, browser test, unit/integration/E2E test, GitHub Actions, Supabase inspection, migration, or deployment has been performed.
 
 Do not treat static checks as runtime acceptance. Keep `main` unchanged until independent security review, key-containment evidence, and separate runtime/implementation authorization are documented.
+
+
+## Reproducible review handoff
+
+The current clean-root branch is a static quarantine snapshot, not a runnable release candidate. Reviewers should record the exact branch head SHA and the file blob SHAs they inspect; a branch name alone is not an immutable review target. The last recorded baseline in this index is not a substitute for reading the live ref.
+
+The frontend manifest currently declares development, build, lint, and preview scripts, but no lockfile or automated test script exists. Their presence is not evidence of a working application, and none was executed during static review. Dependency restoration, lockfile creation, lint/build, local startup, CI, and tests require separate written authorization after security clearance.
+
+A review of this snapshot must not be described as a review of the historical `main` code, and clearing the historical configuration must not automatically authorize this orphan-lineage snapshot to run. Record the exact implementation branch/base commit and allowed commands separately before any executable work.
