@@ -1,13 +1,12 @@
 # WURI Clean-Root Review Package
 
-**Review status:** Draft / review only  
-**Snapshot branch:** `security/clean-root-quarantine-2026-11-07`  
+**Review status:** Merged reviewer-index handoff; source review and security clearance remain pending  
 **Snapshot branch:** `security/clean-root-quarantine-2026-11-07` (review the live branch head; do not rely on a pinned historical SHA in this handoff)  
 **Main branch:** must remain unchanged pending security clearance.
 
-## PR scope warning
+## PR scope and merge record
 
-This PR changes **only this `REVIEW-ONLY.md` file**. It does not carry the clean-root source snapshot or its remediation commits as a PR diff. The snapshot is a separate orphan-lineage branch and must be reviewed directly using the branch tree and its source index. This PR is not a complete code-review bundle and is not mergeable into `main` by intent.
+PR #2 (`[DRAFT REVIEW HANDOFF ONLY] WURI clean-root snapshot index`) changed **only this `REVIEW-ONLY.md` file** and was merged on 2026-11-07 into `security/clean-root-quarantine-2026-11-07`, not `main`. Merge commit: `41d3e72e12f6f659132f29f681fbbd8c71c224f2`. It does not carry the clean-root source snapshot or its remediation commits as a PR diff. The snapshot is a separate orphan-lineage branch and must be reviewed directly using the branch tree and its source index. This handoff is not a complete code-review bundle, does not authorize execution, and does not constitute independent security clearance.
 
 ## Review entry points
 
