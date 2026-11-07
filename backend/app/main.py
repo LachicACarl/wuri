@@ -33,28 +33,25 @@ from .security import (
 )
 from .storage import PrivateStorage
 from .request_limits import RequestBodyLimitMiddleware
+from .cors_config import configured_cors_origins
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 app = FastAPI(title="WURI Ranking Readiness API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
-    expose_headers=["Content-Type"],
-)
-
+# The last middleware registered is outermost in Starlette. Keep CORS outside
+# the request guard so approved origins retain CORS headers on 413 responses.
 app.add_middleware(
     RequestBodyLimitMiddleware,
     max_body_bytes=MAX_UPLOAD_BYTES + 1024 * 1024,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=configured_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
+    expose_headers=["Content-Type"],
 )
 
 database = Database()
