@@ -14,6 +14,14 @@ is `ready`. Any `blocked` or `manual_verification_required` result keeps real
 institutional intake blocked. The output does not include commands, paths,
 tokens, document names, or institutional data.
 
+**The current preflight intentionally cannot certify external/manual controls.**
+Scanner trust, ingress configuration, container isolation, institutional
+authorization, audit retention, and recovery include manual checks. The
+overall gate therefore remains blocked until those checks are independently
+reviewed and accepted through a documented evidence process. Do not modify
+the program or environment to force a green result. No signed or auditable
+deployment-attestation workflow exists yet.
+
 ## Configuration and persistence boundaries
 
 - `WURI_DATABASE_PATH`: path to the application's **local SQLite database**.
@@ -64,6 +72,16 @@ version/signature update process, and documented clean/infected test behavior.
 A configured test command or environment boolean cannot prove production
 malware scanning is active.
 
+The scanner command is a privileged deployment setting: configuring an
+arbitrary executable that returns exit code `0` can cause the upload path to
+receive a `clean` result. Therefore, do not configure a placeholder, test
+program, shell utility, or unreviewed executable as the production scanner.
+Only an independently verified scanner wrapper may be configured by an
+authorized deployment administrator. This documentation does not itself
+enforce scanner identity at runtime; that limitation must not be mistaken for
+a completed security control. Real document intake remains prohibited until
+the scanner and the separate security gate are accepted.
+
 ## Gate checks
 
 The preflight reports:
@@ -106,9 +124,12 @@ recoverability.
 ## Final enablement checklist
 
 Before enabling real institutional evidence intake, an administrator must
-confirm:
+confirm and retain evidence for each item:
 
-1. The preflight exits successfully in the actual deployment environment.
+1. All automated preflight checks pass, and every manual check has been
+   separately reviewed and accepted by its accountable owner. The current
+   CLI reports manual checks explicitly and cannot, by itself, attest that
+   external controls are complete.
 2. The real scanner binary/wrapper passes its documented clean and infected
    tests and its update process is operational.
 3. HTTPS, Secure cookies, exact CORS origins, private durable storage, backup,
