@@ -327,8 +327,15 @@ def login(request: LoginRequest, response: Response, http_request: Request):
     # Use the direct ASGI peer address. Do not trust X-Forwarded-For unless a
     # separately configured trusted-proxy layer sanitizes it.
     client_host = http_request.client.host if http_request.client else "unknown"
-    rate_key = hashlib.sha256(client_host.encode("utf-8")).hexdigest()
-    retry_after = database.login_rate_limit_status(rate_key)
+    normalized_login = request.username.strip().lower()
+    ip_rate_key = hashlib.sha256(f"ip:{client_host}".encode("utf-8")).hexdigest()
+    account_rate_key = hashlib.sha256(
+        f"account:{client_host}:{normalized_login}".encode("utf-8")
+    ).hexdigest()
+    retry_after = max(
+        database.login_rate_limit_status(account_rate_key),
+        database.login_rate_limit_status(ip_rate_key),
+    )
     if retry_after:
         raise HTTPException(
             status_code=429,
@@ -343,9 +350,15 @@ def login(request: LoginRequest, response: Response, http_request: Request):
         except ValueError as error:
             raise HTTPException(status_code=503, detail="Authentication configuration is invalid.") from error
 
-    user = database.user_by_username(request.username.strip().lower())
+    user = database.user_by_username(normalized_login)
     if not user or user["status"] != "active" or not verify_password(request.password, user["password_hash"]):
-        retry_after = database.record_login_failure(rate_key)
+        account_retry = database.record_login_failure(
+            account_rate_key, max_attempts=5, window_seconds=900
+        )
+        ip_retry = database.record_login_failure(
+            ip_rate_key, max_attempts=20, window_seconds=900
+        )
+        retry_after = max(account_retry, ip_retry)
         if retry_after:
             raise HTTPException(
                 status_code=429,
@@ -354,7 +367,8 @@ def login(request: LoginRequest, response: Response, http_request: Request):
             )
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
-    database.clear_login_failures(rate_key)
+    database.clear_login_failures(account_rate_key)
+    database.clear_login_failures(ip_rate_key)
     token = create_session_token(user["id"], secret)
     claims = read_session_claims(token, secret)
     if not claims:
