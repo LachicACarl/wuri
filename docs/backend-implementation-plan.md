@@ -5,9 +5,9 @@
 
 ## 1. Current verified repository boundary
 
-The inspected recovery branch contains a React/Vite frontend under `university-ranking-dss/`. No backend, API, or server source directory is currently present in the inspected tree.
+The current clean-root snapshot (`security/clean-root-quarantine-2026-11-07`) contains a React/Vite frontend under `university-ranking-dss/` that renders only a static security-hold screen. No backend, API, or server source directory is present in the inspected tree.
 
-The frontend calls `POST /api/upload`, but this repository does not currently contain a handler for that route. Login is intentionally disabled because no reviewed server-side authentication service is available.
+The earlier prototype had a `POST /api/upload` integration, but that request, file input, and upload form were removed from the current clean-root snapshot. The current frontend does not call `/api/upload`; no handler exists. Login and authentication are unavailable because no reviewed server-side authentication service is implemented.
 
 ## 2. Implementation workstreams (in dependency order)
 
@@ -79,9 +79,9 @@ The frontend calls `POST /api/upload`, but this repository does not currently co
 
 These specifications were added for review while the hold remains active:
 
-- `docs/authentication-contract-proposed.md`: server-managed sessions, endpoint surface, role checks, CSRF/CORS, and fail-closed behavior.
-- `docs/database-schema-proposed.md`: logical tenant-scoped entities, evidence provenance, assessment versioning, audit events, and server-enforced access matrix.
-- `docs/assessment-api-contract-proposed.md`: the existing frontend upload request/response shape and required failure semantics.
+- `docs/authentication-contract-proposed.md`: proposed server-managed sessions, endpoint surface, role checks, CSRF/CORS, and fail-closed behavior.
+- `docs/database-schema-proposed.md`: proposed logical tenant-scoped entities, evidence provenance, assessment versioning, audit events, and server-enforced access matrix.
+- `docs/assessment-api-contract-proposed.md`: a proposed future upload request/response shape and required failure semantics; it is not a current frontend contract.
 
 They are deliberately logical/proposed designs. They do not establish an approved identity provider, database, storage service, methodology, or runtime.
 
