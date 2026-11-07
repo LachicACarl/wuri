@@ -29,6 +29,10 @@ MAX_DOCX_TEXT_CHARS = 5_000_000
 MAX_TEXT_CHARS = 5_000_000
 
 
+class ParserWorkerUnavailableError(RuntimeError):
+    """The isolated parser process could not be started safely."""
+
+
 @dataclass(frozen=True)
 class ExtractedBlock:
     text: str
@@ -297,26 +301,34 @@ def extract_blocks_isolated(
     except subprocess.TimeoutExpired as error:
         raise TimeoutError("Document parsing exceeded the execution time limit.") from error
     except OSError as error:
-        raise RuntimeError("The isolated document parser could not be started.") from error
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser could not be started."
+        ) from error
 
     try:
         result = json.loads(completed.stdout.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RuntimeError("The isolated document parser returned an invalid response.") from error
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser returned an invalid response."
+        ) from error
 
     if completed.returncode != 0:
         message = result.get("error", "The isolated document parser failed.")
         if result.get("error_type") == "ValueError":
             raise ValueError(message)
+        if result.get("error_type") == "WorkerLimitsUnavailable":
+            raise ParserWorkerUnavailableError(message)
         raise RuntimeError(message)
 
     if os.name == "posix" and result.get("resource_limits_applied") is not True:
-        raise RuntimeError("Parser worker resource limits were not applied.")
+        raise ParserWorkerUnavailableError("Parser worker resource limits were not applied.")
 
     try:
         return [ExtractedBlock(**block) for block in result["blocks"]]
     except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError("The isolated document parser returned invalid blocks.") from error
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser returned invalid blocks."
+        ) from error
 
 
 def _split_long_text(text: str, max_chars: int, overlap_chars: int) -> Iterable[str]:
