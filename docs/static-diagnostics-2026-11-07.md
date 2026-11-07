@@ -56,6 +56,10 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 **Conclusion:** This review found no new executable defect that can responsibly be confirmed without running the project. It did find and correct stale documentation in this branch. The application itself remains intentionally unavailable. 
 
 
+## Contract review boundary — 2026-11-07
+
+The backend implementation plan, assessment API, authentication, and database schema documents are design proposals only. The proposed asynchronous `202 Accepted` response is illustrative, not an approved HTTP contract. Completed-result fields, score units/ranges, required-framework completeness, status names/transitions, polling/notification, idempotency scope/retention/conflict behavior, identity-provider issuer mapping, session lifetimes/revocation propagation, physical DB constraints, retention/deletion, and research methodology remain unresolved. Do not implement from example JSON or treat example values/roles as institution-approved decisions.
+
 ## Review package / pull-request comparison note — 2026-11-07
 
-PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. At the time of this diagnostics update, the clean-root branch head was `0280c6211948d96caaec15c073c1881607b34c5d`; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. PR #2 is a reviewer-index handoff only, not a source-remediation PR. Do not merge it into `main`.
+PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. The clean-root branch advances independently of this report; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. Do not rely on an old pinned SHA in this report. PR #2 is a reviewer-index handoff only, not a source-remediation PR. Do not merge it into `main`.
