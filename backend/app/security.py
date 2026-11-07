@@ -14,6 +14,8 @@ MIN_SESSION_SECRET_BYTES = 32
 def validate_session_secret(secret: str | None) -> str:
     if not isinstance(secret, str) or len(secret.encode("utf-8")) < MIN_SESSION_SECRET_BYTES:
         raise ValueError("WURI_SESSION_SECRET must contain at least 32 bytes.")
+    if len(set(secret)) < 8:
+        raise ValueError("WURI_SESSION_SECRET must not be a repeated or low-diversity value.")
     return secret
 
 
