@@ -419,85 +419,38 @@ const Dashboard = ({ evaluation, history }) => {
   )
 }
 
-const DocumentUpload = ({ onEvaluation }) => {
-  const [status, setStatus] = useState('')
-  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0])
-  const fileInputRef = useRef(null)
-
-  const handleFileChange = async (event) => {
-    const input = event.currentTarget
-    const file = input.files?.[0]
-    if (!file) return
-
-    setStatus('Uploading document to the configured assessment API...')
-    onEvaluation(null)
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('document_type', documentType)
-
-    try {
-      const response = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!response.ok) {
-        throw new Error(`Assessment API returned HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-      if (!isUsableBackendEvaluation(data)) {
-        throw new Error('The API response does not contain the required validated assessment fields.')
-      }
-
-      onEvaluation(data)
-      setStatus(`Backend assessment received for ${data.school_name}.`)
-    } catch (error) {
-      onEvaluation(null)
-      setStatus(`No assessment was generated: ${error instanceof Error ? error.message : 'Assessment API unavailable'}. No demonstration scores were substituted.`)
-    } finally {
-      // Allow the same file to be selected again to retry a failed upload.
-      input.value = ''
-    }
-  }
-
-  return (
-    <section className="space-y-6 p-6 lg:p-8">
-      <div>
-        <h2 className="text-3xl font-black tracking-normal text-slate-950">Document Integration & Screening</h2>
-        <p className="mt-2 max-w-3xl text-sm text-slate-500">Upload PDF, DOCX, or TXT evidence. The workflow tracks document type, source metadata, extraction status, role access, and evidence segmentation.</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-lg font-black text-slate-950">Document Collection Coverage</h3>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {DOCUMENT_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setDocumentType(type)}
-                className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${documentType === type ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-slate-900 hover:bg-white"
-          >
-            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileChange} />
-            <CloudUpload className="mb-4 text-slate-900" size={42} />
-            <h3 className="text-xl font-black text-slate-950">Upload Institutional Evidence</h3>
-            <p className="mt-2 max-w-lg text-sm text-slate-500">Supported formats: PDF, DOCX, TXT. Selected type: <span className="font-bold text-slate-900">{documentType}</span></p>
-            <span className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white">Browse Files</span>
-          </div>
-          {status && <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">{status}</div>}
-        </div>
-      </div>
-    </section>
-  )
-}
+const DocumentUpload = () => (
+  <section className="space-y-6 p-6 lg:p-8">
+    <div>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Document Upload — Unavailable</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        Secure document intake is not implemented. No file will be selected, uploaded,
+        transmitted, or stored by this page.
+      </p>
+    </div>
+    <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+      <div className="font-black">Do not submit institutional documents</div>
+      <p className="mt-2">
+        The backend upload endpoint, authentication, private storage policies, malware
+        screening, and evidence-provenance pipeline have not been independently reviewed
+        or authorized. File transfer is disabled until those controls are implemented
+        and tested in an approved isolated environment.
+      </p>
+    </div>
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <h3 className="font-bold text-slate-900">Planned supported document classes</h3>
+      <ul className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-2">
+        {DOCUMENT_TYPES.map((type) => (
+          <li key={type} className="rounded-md bg-slate-50 px-3 py-2">{type}</li>
+        ))}
+      </ul>
+      <p className="mt-4 text-xs text-slate-500">
+        The list describes future scope only. It does not mean these file types can
+        currently be uploaded or processed.
+      </p>
+    </div>
+  </section>
+)
 
 const EvidenceView = ({ evaluation }) => {
   const hasValidatedResult = isUsableBackendEvaluation(evaluation)
