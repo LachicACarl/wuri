@@ -506,9 +506,9 @@ def _delete_temporary_upload(storage_key: str | None) -> None:
         return
     try:
         storage.delete(storage_key)
-    except (OSError, ValueError):
-        # Keep the request fail-closed; a deployment should separately alert
-        # on storage cleanup failures and run a private-object reconciliation.
+    except Exception:
+        # Cleanup must not replace the original upload failure. Deployments
+        # should separately alert on orphaned objects and reconcile private storage.
         pass
 
 
