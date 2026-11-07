@@ -1,7 +1,7 @@
 # WURI Security Hold — Clearance Evidence Checklist
 
 **Decision: HOLD — NO-GO**  
-**Scope:** Repository remediation branch `security/recovery-remove-obfuscated-vite-config`  
+**Scope:** Historical remediation branch `security/recovery-remove-obfuscated-vite-config` and isolated review snapshot `security/clean-root-quarantine-2026-11-07`  
 **Purpose:** Track evidence required before the security hold can be reconsidered. This document is a checklist, not a security clearance.
 
 ## 1. Repository-side remediation observed
@@ -10,9 +10,8 @@ The current recovery branch contains the following changes:
 
 - Standard Vite configuration replaces the obfuscated configuration in the current branch tree.
 - Root `node_modules/` is absent from the current branch tree; root ignore rules exclude dependencies, build outputs, local environment files, and logs.
-- The frontend no longer creates synthetic EQAM/RRS/ARRS results from sample passages and file metadata.
-- The frontend rejects incomplete backend assessment responses and does not substitute local placeholder scores.
-- The hardcoded browser-side `admin / admin123` login was removed. Sign-in fails closed because a reviewed server-side authentication implementation is not present.
+- The clean-root frontend now contains only a static security-hold screen. No upload control, API request, results renderer, scoring constants, frontend authentication state, or Supabase client remains in the current UI.
+- No client-side sign-in is implemented. Authentication is unavailable until an approved server-side service is built and reviewed.
 - Root README documents the project structure, hold, and restrictions.
 
 These changes do **not** establish that historical commits or dependency artifacts were safe, that the suspicious code was never executed, or that any credential was revoked.
@@ -68,13 +67,13 @@ For every newly authorized gate, record the approving person, date, exact commit
 
 These are not completed:
 
-1. Independent dependency/lockfile provenance review for both root and `university-ranking-dss/` package manifests.
-2. Decision on whether the root package manifest/lockfile is an intentional separate project or obsolete duplicate.
-3. Server-side authentication/session contract and authorization model.
-4. Assessment API contract, response schema, evidence provenance, and error behavior.
-5. PostgreSQL adapter/schema/migration/rollback design, if formally approved.
-6. Private document storage access, retention, and recovery design, if formally approved.
-7. Isolated testing with synthetic data after explicit AUTH-02 through AUTH-04 authorization.
+1. Independent dependency provenance review for `university-ranking-dss/package.json` and all referenced tooling; regenerate a reviewed lockfile only after authorization.
+2. Confirm whether any root-level package manifest exists; the current clean-root tree has only `university-ranking-dss/package.json`.
+3. Server-side authentication/session contract and authorization model review.
+4. Assessment API contract review; the proposed endpoint is not implemented and the current frontend does not send uploads.
+5. PostgreSQL schema/migration/rollback design review, if formally approved.
+6. Private document storage access, retention, and recovery design review, if formally approved.
+7. Isolated testing with synthetic data only after explicit AUTH-02 through AUTH-04 authorization.
 
 ## 6. Current disposition
 
