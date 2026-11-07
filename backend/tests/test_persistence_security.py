@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.database import Database
 from app.research_validation import split_evidence_dataset
-from app.security import create_session_token, hash_password, read_session_token, verify_password
+from app.security import create_session_token, hash_password, read_session_claims, read_session_token, validate_session_secret, verify_password
 from app.storage import PrivateStorage
 from research_fixtures import approve_synthetic_panel_dataset
 
@@ -24,9 +24,39 @@ class PersistenceSecurityTests(unittest.TestCase):
         self.assertNotEqual(encoded, password)
         self.assertTrue(verify_password(password, encoded))
         self.assertFalse(verify_password("wrong password", encoded))
-        token = create_session_token("user-1", "secret")
-        self.assertEqual(read_session_token(token, "secret"), "user-1")
-        self.assertIsNone(read_session_token(token, "wrong-secret"))
+        secret = "s" * 32
+        token = create_session_token("user-1", secret)
+        self.assertEqual(read_session_token(token, secret), "user-1")
+        self.assertIsNone(read_session_token(token, "w" * 32))
+        claims = read_session_claims(token, secret)
+        self.assertEqual(claims["user_id"], "user-1")
+        self.assertTrue(claims["session_id"])
+        with self.assertRaises(ValueError):
+            validate_session_secret("short")
+
+    def test_sessions_are_persistently_revocable_and_expire(self):
+        user_id = self.database.ensure_admin(
+            "session-owner", hash_password("session owner password")
+        )
+        session_id = "synthetic-session-id"
+        self.database.create_session(session_id, user_id, 2_000)
+        self.assertTrue(self.database.session_is_active(session_id, user_id, now=1_000))
+        self.assertFalse(self.database.session_is_active(session_id, user_id, now=2_000))
+        self.database.create_session("revoke-me", user_id, 3_000)
+        self.assertTrue(self.database.revoke_session("revoke-me", now=1_500))
+        self.assertFalse(self.database.session_is_active("revoke-me", user_id, now=1_501))
+
+    def test_login_rate_limit_is_atomic_persistent_and_windowed(self):
+        rate_key = "synthetic-hashed-client-key"
+        for attempt in range(4):
+            self.assertEqual(self.database.record_login_failure(rate_key, now=10_000 + attempt), 0)
+        retry_after = self.database.record_login_failure(rate_key, now=10_004)
+        self.assertGreater(retry_after, 0)
+        reopened = Database(self.root / "test.sqlite3")
+        self.assertGreater(reopened.login_rate_limit_status(rate_key, now=10_005), 0)
+        self.assertEqual(reopened.login_rate_limit_status(rate_key, now=11_000), 0)
+        reopened.clear_login_failures(rate_key)
+        self.assertEqual(reopened.login_rate_limit_status(rate_key, now=10_005), 0)
 
     def test_records_survive_new_database_connection(self):
         user_id = self.database.ensure_admin("admin", hash_password("correct horse battery staple"))
