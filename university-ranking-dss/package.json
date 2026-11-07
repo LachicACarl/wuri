@@ -1,5 +1,5 @@
 {
-  "name": "university-ranking-dss",
+  "name": "wuri-ranking-readiness-dss",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,7 +15,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.2",
-    "recharts": "^2.15.4",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
@@ -25,5 +24,6 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.5",
     "globals": "^17.11.0"
-  }
+  },
+  "description": "Quarantined WURI ranking readiness frontend; non-operational security-hold snapshot."
 }
