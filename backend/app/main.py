@@ -585,64 +585,73 @@ async def upload_document(
         _delete_temporary_upload(storage_key)
         raise HTTPException(status_code=422, detail="The document contains no extractable text.")
 
-    document_id = str(uuid4())
-    if not assessment_id:
-        assessment_id = database.create_assessment(user["id"], institution_id, "document_extracted")
-    passages = segment_blocks(blocks, document_id, filename)
-    warnings = []
-    matches = []
-    model_path = os.getenv("WURI_SBERT_MODEL_PATH")
-    model_artifact_available = has_local_sentence_transformer_artifact(model_path)
-    if model_artifact_available:
-        try:
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer(model_path, local_files_only=True)
-            matches = retrieve_matches(passages, model=model)
-        except (ImportError, OSError, RuntimeError, ValueError):
-            model_artifact_available = False
-            warnings.append("Semantic retrieval is unavailable; the configured local model artifact could not be loaded.")
-    else:
-        warnings.append("Semantic retrieval is unavailable; no valid local model artifact is configured.")
-
-    assessment_status = determine_status(
-        has_passages=bool(passages),
-        has_matches=bool(matches),
-        model_artifact_available=model_artifact_available,
-    )
-    document = {
-        "document_id": document_id,
-        "filename": filename,
-        "file_type": extension.lstrip("."),
-        "file_size": len(content),
-        "checksum": checksum,
-        "storage_key": storage_key,
-        "extraction_status": "success",
-        "title": title or filename,
-        "source_reference": source_reference,
-        "collection_date": collection_date,
-        "reporting_period": reporting_period,
-        "provenance": provenance,
-        "limitations": limitations,
-        "authorization_status": "unknown",
-        "research_permission_status": "unknown",
-        "malware_scan_status": scan.status,
-        "malware_scanned_at": datetime.now(timezone.utc).isoformat(),
-        "malware_scanner": scan.scanner,
-        "mapping": (
-            {"framework_id": framework_id, "framework_edition": framework_edition,
-             "criterion_id": criterion_id}
-            if framework_id else None
-        ),
-    }
+    created_assessment = False
     try:
-        database.persist_document(user["id"], institution_id, assessment_id, document,
-                                  [passage.as_dict() for passage in passages],
-                                  [match.as_dict() for match in matches])
-    except (PermissionError, OSError, ValueError) as error:
-        if storage_key:
-            storage.delete(storage_key)
-        database.remove_empty_assessment(user["id"], assessment_id)
-        raise HTTPException(status_code=500, detail="The document could not be persisted.") from error
+        document_id = str(uuid4())
+        if not assessment_id:
+            assessment_id = database.create_assessment(user["id"], institution_id, "document_extracted")
+            created_assessment = True
+        passages = segment_blocks(blocks, document_id, filename)
+        warnings = []
+        matches = []
+        model_path = os.getenv("WURI_SBERT_MODEL_PATH")
+        model_artifact_available = has_local_sentence_transformer_artifact(model_path)
+        if model_artifact_available:
+            try:
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(model_path, local_files_only=True)
+                matches = retrieve_matches(passages, model=model)
+            except Exception:
+                model_artifact_available = False
+                warnings.append("Semantic retrieval is unavailable; the configured local model artifact could not be loaded.")
+        else:
+            warnings.append("Semantic retrieval is unavailable; no valid local model artifact is configured.")
+
+        assessment_status = determine_status(
+            has_passages=bool(passages),
+            has_matches=bool(matches),
+            model_artifact_available=model_artifact_available,
+        )
+        document = {
+            "document_id": document_id,
+            "filename": filename,
+            "file_type": extension.lstrip("."),
+            "file_size": len(content),
+            "checksum": checksum,
+            "storage_key": storage_key,
+            "extraction_status": "success",
+            "title": title or filename,
+            "source_reference": source_reference,
+            "collection_date": collection_date,
+            "reporting_period": reporting_period,
+            "provenance": provenance,
+            "limitations": limitations,
+            "authorization_status": "unknown",
+            "research_permission_status": "unknown",
+            "malware_scan_status": scan.status,
+            "malware_scanned_at": datetime.now(timezone.utc).isoformat(),
+            "malware_scanner": scan.scanner,
+            "mapping": (
+                {"framework_id": framework_id, "framework_edition": framework_edition,
+                 "criterion_id": criterion_id}
+                if framework_id else None
+            ),
+        }
+        database.persist_document(
+            user["id"], institution_id, assessment_id, document,
+            [passage.as_dict() for passage in passages],
+            [match.as_dict() for match in matches],
+        )
+    except Exception as error:
+        _delete_temporary_upload(storage_key)
+        if created_assessment and assessment_id:
+            try:
+                database.remove_empty_assessment(user["id"], assessment_id)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=500, detail="The document could not be persisted."
+        ) from error
 
     return {
         "document": {
