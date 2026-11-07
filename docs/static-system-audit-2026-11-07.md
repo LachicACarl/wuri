@@ -1,7 +1,7 @@
 # WURI DSS Static System Audit — 2026-11-07
 
 **Target:** `security/clean-root-quarantine-2026-11-07`  
-**Historical context:** `security/recovery-remove-obfuscated-vite-config`  
+**Historical context:** `security/recovery-remove-obfuscated-vite-config` (legacy branch; not current source)  
 **Audit type:** GitHub source/tree inspection only  
 **Status:** HOLD — NO-GO; not a runtime test, penetration test, build, lint, or database audit  
 **Current state:** security-hold frontend snapshot only
