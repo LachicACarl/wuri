@@ -205,7 +205,7 @@ class ResearchApiTests(unittest.TestCase):
                     "criterion_id": criterion_id,
                     "title": "Synthetic acceptance evidence",
                 },
-                files={"file": ("acceptance.txt", b"Synthetic acceptance evidence.", "text/plain")},
+                files={"file": ('acceptance"bad.txt', b"Synthetic acceptance evidence.", "text/plain")},
             )
         self.assertEqual(response.status_code, 200, response.text)
         document_id = response.json()["document"]["document_id"]
@@ -258,6 +258,10 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(updated.status_code, 200, updated.text)
         downloaded = self.client.get(f"/api/documents/{document_id}/download")
         self.assertEqual(downloaded.status_code, 200)
+        self.assertEqual(
+            downloaded.headers["content-disposition"],
+            "attachment; filename*=UTF-8''acceptance%22bad.txt",
+        )
         deleted = self.client.delete(f"/api/documents/{document_id}")
         self.assertEqual(deleted.status_code, 200, deleted.text)
         self.assertEqual(self.client.get(f"/api/assessments/{assessment_id}").status_code, 200)
