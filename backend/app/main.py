@@ -556,6 +556,8 @@ async def upload_document(
                 storage.delete(storage_key)
             except OSError:
                 pass
+        if isinstance(error, HTTPException):
+            raise error
         raise HTTPException(
             status_code=422, detail="The document could not be extracted."
         ) from error
