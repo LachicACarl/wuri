@@ -548,10 +548,14 @@ async def upload_document(
         if storage_key:
             storage.delete(storage_key)
         raise
-    except (OSError, UnicodeDecodeError, ValueError, RuntimeError) as error:
+    except Exception as error:
+        # Parser libraries can raise format-specific exceptions outside the
+        # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
         if storage_key:
             storage.delete(storage_key)
-        raise HTTPException(status_code=422, detail="The document could not be extracted.") from error
+        raise HTTPException(
+            status_code=422, detail="The document could not be extracted."
+        ) from error
 
     if not blocks:
         if storage_key:
