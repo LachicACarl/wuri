@@ -6,7 +6,7 @@
 
 ## Executive result
 
-The current branch is a quarantined React/Vite frontend snapshot. The application intentionally renders a security-hold screen. The initial audit report described the older prototype in parts; this report is the current-state source inventory.
+The current branch is a quarantined static HTML/CSS security-hold page plus an unmounted React/Vite source fragment. `index.html` contains no module script; `src/main.jsx` is absent, so `src/App.jsx` is not loaded. The initial audit report described the older prototype in parts; this report is the current-state source inventory.
 
 ## Confirmed source-level findings
 
@@ -23,16 +23,18 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 | HIGH | Runtime/build state is unknown | Dependencies are not installed; scripts have not been run | Not tested |
 | HIGH | Security approval is pending | Issue #1 has no independent reviewer or authorized Supabase-owner approval comment | Pending |
 | HIGH | Exposed credential containment is unverified | No owner confirmation of revocation/replacement is recorded | Pending |
-| MEDIUM | Frontend is intentionally non-operational | App.jsx renders a hold message on all routes | By design |
+| MEDIUM | Frontend is intentionally non-operational | `index.html` renders a static hold page; `src/App.jsx` is unmounted and `src/main.jsx` is absent | By design / confirmed by tree inspection |
+| HIGH | React entrypoint is missing | `index.html` has no module script and the tracked tree has no `src/main.jsx`; Vite/React scripts cannot be assumed to serve the React component | Confirmed statically |
+| LOW | Favicon is unreferenced | `public/favicon.svg` exists but `index.html` has no favicon link | Confirmed statically |
 | MEDIUM | Remaining hero asset is not referenced by current App.jsx | Binary asset retained; no safe binary editing performed through text-only operations | Static observation |
 
 ## Checks performed in this review
 
 - Re-read the tracked application source/configuration files and relevant review documentation in the current tree. Some binary assets were identified by tree metadata only.
-- Confirmed the app entry imports React, React DOM, React Router, and the global CSS file.
+- Confirmed `index.html` is a standalone HTML/CSS page with no module script; `src/main.jsx` is absent, and the tracked `src/App.jsx` is not mounted.
 - Confirmed the Vite config contains the standard React and Tailwind plugins, without the previously observed dynamic code-loader pattern in this branch's current Vite config.
 - Confirmed there is no TypeScript source, Python source, backend directory, Supabase client import, upload handler, file input, or score computation in the current app source.
-- Confirmed HTML metadata title, description, and noindex directive are present.
+- Confirmed HTML metadata title, description, and noindex directive are present; no favicon link is present despite a tracked public favicon.
 - Confirmed the dependency lockfile and node_modules are absent.
 - Read the package manifest and noted declared React/Vite/ESLint/Tailwind major versions; compatibility is intentionally unverified because no dependency installation or package-manager resolution was performed.
 - Confirmed the package manifest has dev/build/lint/preview scripts but no test script; the current tree contains no test source files.
@@ -59,7 +61,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 5. Keep production, real institutional data, database writes, and deployment separately gated.
 6. Re-verify the current branch SHA before external review; the snapshot branch may advance after this report.
 
-**Conclusion:** This review found no new executable defect that can responsibly be confirmed without running the project. It did find and correct stale documentation in this branch. The application itself remains intentionally unavailable. 
+**Conclusion:** This static review found an additional confirmed structural defect: the tracked React component has no entrypoint and is not loaded by `index.html`. The active hold page is standalone HTML/CSS. No runtime/build claim is made; the security hold remains in force. 
 
 
 ## Contract review boundary — 2026-11-07
