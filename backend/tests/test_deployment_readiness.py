@@ -89,6 +89,37 @@ class DeploymentReadinessTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     configured_cors_origins()
 
+    def test_scanner_boolean_flag_cannot_self_attest_arbitrary_executable(self):
+        with patch.dict(
+            os.environ,
+            {
+                "WURI_MALWARE_SCANNER_COMMAND": "python",
+                "WURI_MALWARE_SCANNER_VERIFIED": "true",
+            },
+            clear=True,
+        ):
+            from app.malware_scanning import scanner_configuration_status
+            status, detail = scanner_configuration_status()
+
+        self.assertEqual(status, "manual_verification_required")
+        self.assertIn("cannot establish", detail)
+        self.assertIn("independently", detail)
+
+    def test_scanner_missing_executable_is_blocked_even_with_verification_flag(self):
+        with patch.dict(
+            os.environ,
+            {
+                "WURI_MALWARE_SCANNER_COMMAND": "/definitely/missing/wuri-scanner",
+                "WURI_MALWARE_SCANNER_VERIFIED": "true",
+            },
+            clear=True,
+        ):
+            from app.malware_scanning import scanner_configuration_status
+            status, detail = scanner_configuration_status()
+
+        self.assertEqual(status, "blocked")
+        self.assertIn("unavailable", detail)
+
     def test_default_report_blocks_without_scanner_and_does_not_expose_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(
