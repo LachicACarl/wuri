@@ -552,7 +552,10 @@ async def upload_document(
         # Parser libraries can raise format-specific exceptions outside the
         # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
         if storage_key:
-            storage.delete(storage_key)
+            try:
+                storage.delete(storage_key)
+            except OSError:
+                pass
         raise HTTPException(
             status_code=422, detail="The document could not be extracted."
         ) from error
