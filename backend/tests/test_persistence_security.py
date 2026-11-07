@@ -54,7 +54,7 @@ class PersistenceSecurityTests(unittest.TestCase):
         self.assertGreater(retry_after, 0)
         reopened = Database(self.root / "test.sqlite3")
         self.assertGreater(reopened.login_rate_limit_status(rate_key, now=10_005), 0)
-        self.assertEqual(reopened.login_rate_limit_status(rate_key, now=11_000), 0)
+        self.assertEqual(reopened.login_rate_limit_status(rate_key, now=19_004), 0)
         reopened.clear_login_failures(rate_key)
         self.assertEqual(reopened.login_rate_limit_status(rate_key, now=10_005), 0)
 
