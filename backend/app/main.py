@@ -30,6 +30,7 @@ from .security import (
     read_session_claims, validate_session_secret, verify_password,
 )
 from .storage import PrivateStorage
+from .request_limits import RequestBodyLimitMiddleware
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
@@ -47,6 +48,11 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
     expose_headers=["Content-Type"],
+)
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=MAX_UPLOAD_BYTES + 1024 * 1024,
 )
 
 database = Database()
