@@ -58,4 +58,4 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 
 ## Review package / pull-request comparison note — 2026-11-07
 
-PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. Reviewers must inspect the clean-root branch directly at the current branch head recorded by GitHub. The draft PR is a reviewer handoff, not a complete source-change PR. Do not merge it into `main`.
+PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. At the time of this diagnostics update, the clean-root branch head was `0280c6211948d96caaec15c073c1881607b34c5d`; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. PR #2 is a reviewer-index handoff only, not a source-remediation PR. Do not merge it into `main`.
