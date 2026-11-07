@@ -1,13 +1,15 @@
+import subprocess
 import unittest
 import zipfile
 from io import BytesIO
+from unittest.mock import patch
 
 import docx
 import fitz
 
 from app.document_processing import (
     MAX_DOCX_COMPRESSION_RATIO, MAX_PDF_PAGES, ExtractedBlock,
-    extract_blocks, segment_blocks,
+    extract_blocks, extract_blocks_isolated, segment_blocks,
 )
 from app.retrieval import retrieve_matches
 
@@ -25,6 +27,18 @@ def fake_cosine_similarity(passages, indicators):
 
 
 class DocumentProcessingTests(unittest.TestCase):
+    def test_isolated_worker_extracts_text(self):
+        blocks = extract_blocks_isolated("worker.txt", "Isolated parser — café".encode("utf-8"))
+        self.assertEqual([block.text for block in blocks], ["Isolated parser — café"])
+
+    def test_isolated_worker_enforces_wall_clock_timeout(self):
+        with patch(
+            "app.document_processing.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["python", "-m", "app.document_parser_worker"], 25),
+        ):
+            with self.assertRaisesRegex(TimeoutError, "execution time limit"):
+                extract_blocks_isolated("timeout.txt", b"synthetic", timeout_seconds=25)
+
     def test_txt_preserves_offsets_and_unicode(self):
         content = "Research innovation\n\nSustainability — água\n".encode()
         blocks = extract_blocks("report.txt", content)
