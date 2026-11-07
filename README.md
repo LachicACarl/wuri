@@ -14,7 +14,7 @@ Install/build/test commands are intentionally not documented as approved executi
 
 ## Current security and integrity status
 
-**HOLD — NO-GO.** This recovery branch is an isolated remediation candidate, not a security-cleared or production-ready branch.
+**HOLD — NO-GO.** This clean-root branch is an isolated source-review snapshot, not a security-cleared or production-ready branch.
 
 - The current clean-root snapshot contains a declarative Vite configuration without the previously identified obfuscated loader. The original suspicious commit remains preserved in `main` history for independent investigation.
 - The clean-root snapshot contains no tracked `node_modules/` directory. Dependencies must be independently reviewed and a lockfile generated only after explicit authorization.
@@ -66,7 +66,7 @@ Until written security clearance and separate implementation/runtime authorizati
 1. Independent review of suspicious commit provenance, behavior, and possible prior execution.
 2. Owner-confirmed revocation of the exposed Supabase service-role key and confirmation that dependent services no longer use it.
 3. Independent provenance review of the single frontend manifest (`university-ranking-dss/package.json`); no dependency lockfile is currently tracked.
-4. Approved server-side authentication and assessment API contracts.
+4. Independently reviewed and approved server-side authentication and assessment API contracts; the current documents are proposals only.
 5. Separate written authorization for implementation, isolated synthetic-data testing, real-data work, and production deployment.
 
 
