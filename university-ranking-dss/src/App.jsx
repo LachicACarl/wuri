@@ -545,11 +545,23 @@ const EvidenceView = ({ evaluation }) => {
   )
 }
 
-const FrameworkAnalysis = ({ evaluation }) => (
+const FrameworkAnalysis = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework-Constrained AHP & TOPSIS</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Official framework weights remain fixed. Operational indicators are checked by AHP consistency and readiness is computed against fixed ideal and anti-ideal references.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Framework Configuration — Proposed</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        The values below are currently hardcoded research configuration placeholders.
+        They are not verified official ranking weights, do not calculate readiness,
+        and must not be used for institutional decisions or research reporting.
+      </p>
+    </div>
+    <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+      <div className="font-black">Not an implemented scoring engine</div>
+      <p className="mt-2">
+        AHP, TOPSIS, EQAM, AES, RRS and ARRS calculations are not implemented in
+        this frontend. The final criteria, weights, thresholds and formulas require
+        approval against the research methodology and authoritative framework sources.
+      </p>
     </div>
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       {FRAMEWORKS.map((framework) => (
@@ -559,14 +571,14 @@ const FrameworkAnalysis = ({ evaluation }) => (
               <h3 className="text-xl font-black text-slate-950">{framework.name}</h3>
               <p className="mt-1 text-sm text-slate-500">{framework.focus}</p>
             </div>
-            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">fixed {Math.round(framework.officialWeight * 100)}%</span>
+            <span className="rounded-lg bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">Proposed 25%</span>
           </div>
           <div className="space-y-3">
             {framework.indicators.map(([indicator, weight]) => (
               <div key={indicator}>
                 <div className="mb-1 flex justify-between text-sm font-bold text-slate-700">
                   <span>{indicator}</span>
-                  <span>{Math.round(weight * 100)}%</span>
+                  <span>{Math.round(weight * 100)}% · proposed</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded bg-slate-100">
                   <div className="h-full rounded" style={{ width: `${weight * 100}%`, backgroundColor: framework.color }} />
@@ -574,11 +586,6 @@ const FrameworkAnalysis = ({ evaluation }) => (
               </div>
             ))}
           </div>
-          {evaluation?.sub_scores?.[framework.name] && (
-            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs font-semibold text-slate-600">
-              Current sub-indicator points: {Object.entries(evaluation.sub_scores[framework.name]).map(([name, points]) => `${name} ${points}`).join(', ')}
-            </div>
-          )}
         </div>
       ))}
     </div>
