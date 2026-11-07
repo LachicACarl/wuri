@@ -28,6 +28,10 @@ The frontend must not present sample passages, filename-derived institution name
 
 A backend response is not automatically valid research output merely because it is returned by an API. Assessment methodology, data provenance, expert validation, authorization, and research gates must be independently approved before real scoring or reporting.
 
+## Connection readiness and recovery
+
+- `docs/connection-readiness-and-recovery-runbook.md` — verified connection boundary, security gates, backend implementation order, and post-approval end-to-end verification sequence. The WURI Supabase project is visible to the connected account, but this does not mean the application is connected to a working backend.
+
 ## Proposed backend design artifacts
 
 The following documents define reviewable designs only; none is implemented or approved for execution:
