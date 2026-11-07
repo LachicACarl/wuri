@@ -24,7 +24,7 @@ class PersistenceSecurityTests(unittest.TestCase):
         self.assertNotEqual(encoded, password)
         self.assertTrue(verify_password(password, encoded))
         self.assertFalse(verify_password("wrong password", encoded))
-        secret = "s" * 32
+        secret = "session-test-secret-with-unique-entropy-2026"
         token = create_session_token("user-1", secret)
         self.assertEqual(read_session_token(token, secret), "user-1")
         self.assertIsNone(read_session_token(token, "w" * 32))
