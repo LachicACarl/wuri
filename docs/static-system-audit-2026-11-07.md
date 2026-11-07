@@ -158,3 +158,18 @@ Inspected recursive tree under `university-ranking-dss/`:
 - No change to `main`.
 
 **This report records static findings only. It does not clear the security hold or authorize code/runtime changes.**
+
+
+## Follow-up UI integrity correction — 2026-11-07
+
+A follow-up static review found that several descriptive panels could imply implementation where only plans or constants exist. The isolated clean-root branch was updated to:
+
+- Label the framework/indicator values as **proposed and unverified**, not official/fixed.
+- State explicitly that AHP, TOPSIS, EQAM, AES, RRS and ARRS are not implemented in the frontend.
+- Rewrite checklist descriptions to distinguish proposed capability from working functionality.
+- Change the checklist page heading to “Proposed Requirements Checklist” and replace green completion marks with amber planned-status indicators.
+- Label architecture as proposed, role model as not enforced, and report artifacts as planned.
+- Label validation material as a proposed plan, state that no evaluation has been executed, and change status labels from “Defined” to “Planned”.
+- Preserve the locked-workspace screen and avoid introducing fake login, sample scores, or backend stubs.
+
+These are source/documentation changes only. They have not been linted, built, executed, or tested because runtime authorization remains absent.
