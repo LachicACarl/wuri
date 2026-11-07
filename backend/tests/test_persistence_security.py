@@ -33,6 +33,8 @@ class PersistenceSecurityTests(unittest.TestCase):
         self.assertTrue(claims["session_id"])
         with self.assertRaises(ValueError):
             validate_session_secret("short")
+        with self.assertRaises(ValueError):
+            validate_session_secret("x" * 48)
 
     def test_sessions_are_persistently_revocable_and_expire(self):
         user_id = self.database.ensure_admin(
