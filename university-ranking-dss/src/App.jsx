@@ -828,44 +828,56 @@ const Shell = ({ children, onLogout }) => {
 }
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [evaluation, setEvaluation] = useState(null)
-  const [history, setHistory] = useState([])
-
-  const handleEvaluation = (nextEvaluation) => {
-    setEvaluation(nextEvaluation)
-    if (!isUsableBackendEvaluation(nextEvaluation)) return
-
-    setHistory((previous) => [
-      {
-        filename: nextEvaluation.filename,
-        schoolName: nextEvaluation.school_name,
-        timestamp: new Date().toLocaleString(),
-        bestFit: nextEvaluation.best_fit,
-        arrs: Number(nextEvaluation.arrs),
-      },
-      ...previous,
-    ])
-  }
+  const unavailableFeatures = [
+    'Authentication and role-based access',
+    'Document upload and extraction',
+    'Assessment scoring and ranking',
+    'Evidence review and explainable results',
+    'Persistent assessment history',
+  ]
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/*" element={isAuthenticated ? (
-        <Shell onLogout={() => setIsAuthenticated(false)}>
-          <Routes>
-            <Route path="/" element={<Dashboard evaluation={evaluation} history={history} />} />
-            <Route path="/upload" element={<DocumentUpload onEvaluation={handleEvaluation} />} />
-            <Route path="/evidence" element={<EvidenceView evaluation={evaluation} />} />
-            <Route path="/analysis" element={<FrameworkAnalysis evaluation={evaluation} />} />
-            <Route path="/xai" element={<ExplainableAI evaluation={evaluation} />} />
-            <Route path="/history" element={<HistoryView history={history} />} />
-            <Route path="/architecture" element={<ArchitectureView />} />
-            <Route path="/checklist" element={<ChecklistView />} />
-            <Route path="/validation" element={<ValidationView />} />
-          </Routes>
-        </Shell>
-      ) : <Navigate to="/login" replace />} />
+      <Route
+        path="*"
+        element={
+          <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+            <section className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="mb-5 inline-flex rounded-lg bg-amber-100 p-3 text-amber-900">
+                <ShieldCheck size={28} />
+              </div>
+              <p className="text-xs font-black uppercase tracking-wider text-amber-700">
+                Recovery workspace · Security hold
+              </p>
+              <h1 className="mt-2 text-3xl font-black text-slate-950">
+                WURI Ranking Readiness DSS
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                This workspace is currently unavailable. The backend, authentication
+                service, database integration, and assessment pipeline have not yet
+                completed independent review and authorized testing.
+              </p>
+              <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <h2 className="font-bold text-amber-950">Features not yet available</h2>
+                <ul className="mt-3 space-y-2 text-sm text-amber-900">
+                  {unavailableFeatures.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2">
+                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="mt-5 text-xs leading-5 text-slate-500">
+                Do not upload institutional documents or enter account credentials.
+                No demonstration scores or sample evidence are presented as research
+                results.
+              </p>
+            </section>
+          </main>
+        }
+      />
     </Routes>
   )
 }
