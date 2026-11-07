@@ -36,6 +36,20 @@ class PersistenceSecurityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_session_secret("x" * 48)
 
+    def test_password_verifier_rejects_unbounded_scrypt_parameters(self):
+        encoded = hash_password("safe test password long")
+        parts = encoded.split("$")
+        malicious_work_factor = "$".join(
+            [parts[0], str(2**30), parts[2], parts[3], parts[4], parts[5]]
+        )
+        self.assertFalse(verify_password("safe test password long", malicious_work_factor))
+        self.assertFalse(verify_password("x" * 1025, encoded))
+        self.assertFalse(verify_password("safe test password long", encoded[:-3]))
+
+    def test_password_hashing_enforces_a_maximum_length(self):
+        with self.assertRaises(ValueError):
+            hash_password("x" * 1025)
+
     def test_sessions_are_persistently_revocable_and_expire(self):
         user_id = self.database.ensure_admin(
             "session-owner", hash_password("session owner password")
