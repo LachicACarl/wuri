@@ -59,7 +59,7 @@ The earlier prototype had a `POST /api/upload` integration, but that request, fi
 
 - Implement `POST /api/upload` only after BE-01 through BE-04 have approved contracts.
 - Return typed, versioned responses matching `docs/assessment-api-contract-proposed.md`.
-- Include explicit request IDs, assessment IDs, methodology/model versions, and provenance references.
+- Include explicit request IDs, assessment IDs, methodology/model/extractor/contract versions, processing status, and source provenance references. Finalize asynchronous processing, idempotency, typed error envelopes, and retry semantics in the API contract before implementation.
 - Return non-success responses when extraction, evidence, or scoring is incomplete; never return placeholder scores.
 - Add authenticated endpoints for assessment retrieval, evidence, history, and XAI only when each is authorized.
 
