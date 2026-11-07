@@ -28,6 +28,33 @@ class DeploymentReadinessTests(unittest.TestCase):
         self.assertEqual(checks["parser_worker_container_isolation"], "manual_verification_required")
         self.assertEqual(report["intake_gate"], "blocked")
 
+    def test_sandbox_environment_flag_cannot_claim_container_isolation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(
+                os.environ,
+                {
+                    "WURI_DATABASE_PATH": str(Path(directory) / "missing.sqlite3"),
+                    "WURI_STORAGE_PATH": str(Path(directory) / "private"),
+                    "WURI_PARSER_SANDBOX_VERIFIED": "true",
+                    "WURI_MALWARE_SCANNER_COMMAND": "python -c pass",
+                    "WURI_MALWARE_SCANNER_VERIFIED": "true",
+                    "WURI_ENVIRONMENT": "production",
+                    "WURI_CORS_ORIGINS": "https://wuri.example",
+                },
+                clear=True,
+            ):
+                report = build_readiness_report()
+
+        checks = {item["name"]: item for item in report["checks"]}
+        self.assertEqual(
+            checks["parser_worker_container_isolation"]["status"],
+            "manual_verification_required",
+        )
+        self.assertIn(
+            "cannot verify container filesystem restrictions",
+            checks["parser_worker_container_isolation"]["detail"],
+        )
+
     def test_cors_origin_configuration_uses_allowlist_and_blocks_production_default(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(
