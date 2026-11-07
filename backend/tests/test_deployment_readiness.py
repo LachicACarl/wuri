@@ -23,7 +23,11 @@ class DeploymentReadinessTests(unittest.TestCase):
         checks = {item["name"]: item["status"] for item in report["checks"]}
         self.assertEqual(checks["application_request_body_limit"], "ready")
         self.assertEqual(checks["ingress_body_limit"], "manual_verification_required")
-        self.assertEqual(checks["parser_process_isolation"], "blocked")
+        self.assertEqual(
+            checks["parser_worker_resource_limits"],
+            "ready" if os.name == "posix" else "blocked",
+        )
+        self.assertEqual(checks["parser_worker_container_isolation"], "manual_verification_required")
         self.assertEqual(report["intake_gate"], "blocked")
 
     def test_default_report_blocks_without_scanner_and_does_not_expose_paths(self):
