@@ -7,6 +7,7 @@ from typing import Any
 
 from .malware_scanning import scanner_configuration_status
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
@@ -73,6 +74,18 @@ def build_readiness_report() -> dict[str, Any]:
     checks.append(_check(
         "upload_parser_limits", "ready",
         f"Supported formats: {', '.join(sorted(SUPPORTED_EXTENSIONS))}; limit: {MAX_UPLOAD_BYTES} bytes.",
+    ))
+    checks.append(_check(
+        "application_request_body_limit", "ready",
+        f"ASGI middleware enforces a total request-body ceiling of {MAX_REQUEST_BODY_BYTES} bytes.",
+    ))
+    checks.append(_check(
+        "ingress_body_limit", "manual_verification_required",
+        "Reverse-proxy or hosting ingress request-body limits must be configured and verified separately.",
+    ))
+    checks.append(_check(
+        "parser_process_isolation", "blocked",
+        "Document parsing does not yet run in a separately resource-limited worker process.",
     ))
     checks.append(_check(
         "authorization_workflow", "manual_verification_required",
