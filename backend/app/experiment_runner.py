@@ -711,10 +711,15 @@ class ResearchExperimentRunner:
                     "limitations": outcome.get("limitations", []),
                 }
             completed_at = datetime.now(timezone.utc).isoformat()
-            runtime_dependencies = {
-                package: package_version(package)
-                for package in ("sentence-transformers", "transformers", "torch", "numpy")
-            } if retrieval_run else {}
+            runtime_dependencies = {}
+            if retrieval_run:
+                for package in ("sentence-transformers", "transformers", "torch", "numpy"):
+                    try:
+                        runtime_dependencies[package] = package_version(package)
+                    except Exception:
+                        # Record optional runtime dependencies explicitly when
+                        # a custom/test executor does not require the ML stack.
+                        runtime_dependencies[package] = "not-installed"
             experiment_id = self.database.persist_research_execution(
                 user_id,
                 institution_id,
