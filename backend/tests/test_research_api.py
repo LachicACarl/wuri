@@ -151,6 +151,21 @@ class ResearchApiTests(unittest.TestCase):
             with self.assertRaises(main.HTTPException):
                 main.session_cookie_secure()
 
+    def test_upload_parser_exception_cleans_temporary_file(self):
+        self.login()
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
         user_id = self.database.user_by_username("research-admin")["id"]
