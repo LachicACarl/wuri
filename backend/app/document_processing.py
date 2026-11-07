@@ -138,7 +138,11 @@ def validate_content(filename: str, content: bytes) -> None:
                     raise ValueError("PDF exceeds the maximum page count.")
                 if document.is_encrypted:
                     raise ValueError("Password-protected PDF files are not supported.")
-        except (fitz.FileDataError, fitz.EmptyFileError) as error:
+        except ValueError:
+            raise
+        except Exception as error:
+            # MuPDF parser errors are not guaranteed to share one stable
+            # exception hierarchy across supported PyMuPDF releases.
             raise ValueError("The PDF file is malformed or unreadable.") from error
     elif extension == ".docx":
         if not content.startswith(b"PK"):
