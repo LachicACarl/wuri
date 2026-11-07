@@ -16,7 +16,7 @@ Install/build/test commands are intentionally not documented as approved executi
 
 **HOLD — NO-GO.** This recovery branch is an isolated remediation candidate, not a security-cleared or production-ready branch.
 
-- The current clean-root snapshot contains a declarative Vite configuration without the previously identified obfuscated loader. The original suspicious commit remains preserved in `main` history for independent investigation. The original commit and `main` history remain preserved for investigation.
+- The current clean-root snapshot contains a declarative Vite configuration without the previously identified obfuscated loader. The original suspicious commit remains preserved in `main` history for independent investigation.
 - The clean-root snapshot contains no tracked `node_modules/` directory. Dependencies must be independently reviewed and a lockfile generated only after explicit authorization.
 - A root `.gitignore` excludes dependency directories, build output, local environment files, and logs.
 - The current `src/App.jsx` contains only a static security-hold screen. It has no upload control, API request, result renderer, session state, scoring constants, or Supabase client.
@@ -34,6 +34,10 @@ A backend response is not automatically valid research output merely because it 
 - `docs/static-system-audit-2026-11-07.md` — static frontend/architecture audit with severity-ranked findings, evidence locations, structural inventory, and remediation order. No runtime commands were executed.
 
 - `docs/current-source-index-2026-11-07.md` — current source tree and verification-status index.
+
+## Dependency inventory
+
+The only application dependency manifest in this snapshot is `university-ranking-dss/package.json`. No dependency lockfile is tracked, and no `node_modules/` directory is present. Dependency provenance and version resolution have not been validated because installation and package-manager execution are outside the current authorization.
 
 ## Proposed backend design artifacts
 
