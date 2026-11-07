@@ -11,7 +11,7 @@
 - The Supabase account named `wuri` lists project `oxvejessjvlsyptqfyyc`.
 - The project was reported as `ACTIVE_HEALTHY`, region `ap-northeast-2`, PostgreSQL 17.
 - The frontend exists under `university-ranking-dss/`.
-- The earlier frontend prototype expected `POST /api/upload`; that request, form, and file input were subsequently removed from the current clean-root snapshot. No upload endpoint exists.
+- The earlier frontend prototype expected `POST /api/upload`; that request, form, and file input were subsequently removed from the current clean-root snapshot. No upload endpoint exists. The route appears only as a proposed future backend target in design documents.
 - No backend/API implementation was found in the inspected recovery-branch tree.
 - Authentication remains intentionally locked pending an approved server-side implementation.
 - The original recovery branch inherits suspicious history and must not be merged. The separate clean-root snapshot was created with an orphan root commit, but copied source remains unreviewed and is not cleared to execute.
@@ -26,8 +26,8 @@ Browser (React/Vite)
   -> private document storage + PostgreSQL access using least-privilege server credentials
   -> extraction and traceable evidence pipeline
   -> approved methodology/model pipeline
-  -> typed assessment API response
-  -> frontend results/evidence views
+  -> typed assessment API response (proposed; contract not finalized)
+  -> frontend results/evidence views (not present in current snapshot)
 
 The browser may use a Supabase publishable/anon key only where appropriate under reviewed RLS policies. A service-role/secret key must never be bundled into frontend code, Vite environment variables exposed to the browser, or checked into Git.
 
@@ -71,12 +71,13 @@ Until all relevant approvals exist, do not install packages, execute scripts, ru
 - Return no scores when required inputs or evidence are missing.
 - Keep synthetic development fixtures separate from real research data.
 
-### BE-05 — API integration
-- Implement authenticated `POST /api/upload` and approved retrieval routes.
-- Version request/response schemas.
-- Return request/assessment IDs, source provenance, extractor/model/methodology versions, evidence, and score provenance.
+### BE-05 — API integration (proposed; not implemented)
+- After separate approvals, finalize the proposed asynchronous API lifecycle, request/assessment IDs, idempotency semantics, status model, typed errors, and completed-result schema.
+- Only then implement authenticated upload and approved retrieval routes.
+- Version request/response schemas and include source provenance plus extractor/model/methodology/contract versions.
+- Do not return scores in an accepted/processing response. Publish a result only after all approved evidence and methodology requirements pass.
 - Fail closed on incomplete extraction or assessment; no placeholder results.
-- Add API contract, authorization, malformed payload, and provenance tests.
+- Add API contract, authorization, malformed payload, retry/idempotency, and provenance tests.
 
 ### BE-06 — Database and operations
 - Review the logical schema before creating migrations.
