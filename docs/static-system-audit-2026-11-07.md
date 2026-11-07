@@ -173,3 +173,17 @@ A follow-up static review found that several descriptive panels could imply impl
 - Preserve the locked-workspace screen and avoid introducing fake login, sample scores, or backend stubs.
 
 These are source/documentation changes only. They have not been linted, built, executed, or tested because runtime authorization remains absent.
+
+
+## Upload and inactive-prototype quarantine — 2026-11-07
+
+A further source review found that the old upload form still attempted `POST /api/upload` even though no backend existed, and dormant dashboard/evidence/XAI/history components still contained code to render API-shaped scores and records. The clean-root branch was updated to:
+
+- Remove the upload form, FormData creation, and `POST /api/upload` request entirely.
+- Display supported document classes only as planned scope; explicitly warn not to submit institutional files or credentials.
+- Replace dashboard, evidence, XAI, and history result views with a clear unavailable/security-hold landing state.
+- Remove inactive route components, frontend authentication boolean, result-shape validator, history state, hardcoded framework/indicator weights, EQAM constants, Recharts imports and unused UI imports.
+- Keep a small React Router entry that displays the security-hold landing page for all paths.
+- Preserve the prior explicit statements that backend, authentication, database integration, extraction, scoring, and research validation are not implemented.
+
+This reduces attack surface and avoids accidental upload attempts, but it is not the requested functioning application. It is a quarantined UI state pending independent security review, credential containment, and written runtime authorization. No source execution, dependency installation, lint, build, tests, Actions, Supabase access, database changes, or deployment occurred.
