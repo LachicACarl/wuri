@@ -83,6 +83,8 @@ jobs:
             echo "The lockfile is already current."
           else
             git commit -m "security: update patched frontend dependencies"
+            git fetch origin "${TARGET_BRANCH}"
+            git rebase FETCH_HEAD
             git push origin "HEAD:${TARGET_BRANCH}"
           fi
       - name: Run ESLint
