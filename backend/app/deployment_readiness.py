@@ -1,12 +1,16 @@
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import shutil
 import sqlite3
 from typing import Any
 
 from .malware_scanning import scanner_configuration_status
+from .cors_config import configured_cors_origins
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
@@ -44,6 +48,25 @@ def build_readiness_report() -> dict[str, Any]:
     except Exception:
         checks.append(_check("secure_session_cookies", "blocked", "Cookie security configuration is invalid."))
 
+    try:
+        origins = configured_cors_origins()
+        environment = os.getenv("WURI_ENVIRONMENT", "development").strip().lower()
+        cors_ready = bool(origins)
+        cors_detail = (
+            f"{len(origins)} exact browser origin(s) are allowlisted."
+            if cors_ready else
+            "No browser origins are configured; set WURI_CORS_ORIGINS for this environment."
+        )
+        if environment in {"production", "prod", "staging"} and not os.getenv("WURI_CORS_ORIGINS", "").strip():
+            cors_ready = False
+            cors_detail = "Production and staging require explicit WURI_CORS_ORIGINS."
+        checks.append(_check("cors_origins", "ready" if cors_ready else "blocked", cors_detail))
+    except ValueError:
+        checks.append(_check(
+            "cors_origins", "blocked",
+            "WURI_CORS_ORIGINS contains an invalid or unsafe origin.",
+        ))
+
     database_path = Path(os.getenv("WURI_DATABASE_PATH") or Path(__file__).resolve().parents[1] / "data" / "wuri.sqlite3")
     try:
         connection = sqlite3.connect(database_path)
@@ -60,6 +83,7 @@ def build_readiness_report() -> dict[str, Any]:
             (3, "research_execution"), (4, "research_import_and_annotations"),
             (5, "five_expert_panel"), (6, "institution_registry_readiness"),
             (7, "secure_evidence_provenance"), (8, "malware_scan_state"),
+            (9, "auth_sessions_and_login_limits"),
         )}
         missing = required - migrations
         checks.append(_check(
@@ -72,6 +96,56 @@ def build_readiness_report() -> dict[str, Any]:
     checks.append(_check(
         "upload_parser_limits", "ready",
         f"Supported formats: {', '.join(sorted(SUPPORTED_EXTENSIONS))}; limit: {MAX_UPLOAD_BYTES} bytes.",
+    ))
+    checks.append(_check(
+        "application_request_body_limit", "ready",
+        f"ASGI middleware enforces a total request-body ceiling of {MAX_REQUEST_BODY_BYTES} bytes.",
+    ))
+    checks.append(_check(
+        "ingress_body_limit", "manual_verification_required",
+        "Reverse-proxy or hosting ingress request-body limits must be configured and verified separately.",
+    ))
+    parser_limits_ready = False
+    parser_limit_detail = (
+        "A POSIX parser worker with CPU, address-space, file-descriptor, and core-dump "
+        "limits is required; this check does not establish container isolation."
+    )
+    if os.name == "posix":
+        try:
+            probe = subprocess.run(
+                [sys.executable, "-m", "app.document_parser_worker", "readiness.txt"],
+                input=b"readiness probe",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                cwd=Path(__file__).resolve().parents[1],
+                timeout=10,
+                check=False,
+            )
+            worker_result = json.loads(probe.stdout.decode("utf-8"))
+            parser_limits_ready = (
+                probe.returncode == 0
+                and worker_result.get("resource_limits_applied") is True
+            )
+            parser_limit_detail = (
+                "A POSIX parser worker applied CPU, address-space, file-descriptor, and core-dump limits; "
+                "container and filesystem/network isolation remain separate mandatory checks."
+                if parser_limits_ready else
+                "The parser worker did not confirm that all process resource limits were applied."
+            )
+        except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError, json.JSONDecodeError):
+            parser_limit_detail = (
+                "The parser worker could not be started and verified during readiness checking."
+            )
+    checks.append(_check(
+        "parser_worker_resource_limits",
+        "ready" if parser_limits_ready else "blocked",
+        parser_limit_detail,
+    ))
+    checks.append(_check(
+        "parser_worker_container_isolation", "manual_verification_required",
+        "A process-level resource limit check cannot verify container filesystem restrictions, "
+        "network isolation, non-root execution, or deployment security context. "
+        "Verify these controls independently; do not use an environment flag as proof.",
     ))
     checks.append(_check(
         "authorization_workflow", "manual_verification_required",

@@ -138,6 +138,19 @@ class ResearchApiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 503)
 
+    def test_login_rejects_overlong_username_and_password_before_authentication(self):
+        too_long_username = self.client.post(
+            "/api/auth/login",
+            json={"username": "u" * 255, "password": "local-test-password-long"},
+        )
+        self.assertEqual(too_long_username.status_code, 422)
+
+        too_long_password = self.client.post(
+            "/api/auth/login",
+            json={"username": "research-admin", "password": "p" * 1025},
+        )
+        self.assertEqual(too_long_password.status_code, 422)
+
     def test_session_cookie_is_secure_by_default_and_local_override_is_explicit(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertTrue(main.session_cookie_secure())
@@ -157,13 +170,107 @@ class ResearchApiTests(unittest.TestCase):
             def scan(self, path):
                 return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
         with patch.object(main, "malware_scanner", Scanner()), patch.object(
-            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
         ):
             response = self.client.post(
                 "/api/upload",
                 files={"file": ("sample.txt", b"synthetic content", "text/plain")},
             )
         self.assertEqual(response.status_code, 422)
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
+    def test_upload_scanner_exception_returns_503_and_cleans_temporary_file(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                raise RuntimeError("synthetic scanner failure")
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks_isolated"
+        ) as parser:
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        parser.assert_not_called()
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
+    def test_upload_cleanup_error_does_not_mask_parser_failure(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
+        ), patch.object(main.storage, "delete", side_effect=OSError("synthetic disk error")):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "The document could not be extracted.")
+
+    def test_upload_unexpected_cleanup_error_does_not_mask_parser_failure(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
+        ), patch.object(main.storage, "delete", side_effect=RuntimeError("unexpected cleanup failure")):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "The document could not be extracted.")
+
+    def test_upload_parser_worker_unavailable_returns_503_and_cleans_file(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main,
+            "extract_blocks_isolated",
+            side_effect=main.ParserWorkerUnavailableError("synthetic worker startup failure"),
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
+    def test_upload_persistence_failure_cleans_temporary_object(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main.database, "persist_document", side_effect=RuntimeError("synthetic database failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["detail"], "The document could not be persisted.")
         self.assertEqual(list(self.storage.root.iterdir()), [])
 
     def test_upload_requires_clean_scan_before_extraction(self):
@@ -304,7 +411,7 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(downloaded.status_code, 200)
         self.assertEqual(
             downloaded.headers["content-disposition"],
-            "attachment; filename*=UTF-8''acceptance%22bad.txt",
+            "attachment; filename*=UTF-8''acceptance%2522bad.txt",
         )
         deleted = self.client.delete(f"/api/documents/{document_id}")
         self.assertEqual(deleted.status_code, 200, deleted.text)

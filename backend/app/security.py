@@ -9,6 +9,14 @@ import time
 SESSION_COOKIE = "wuri_session"
 SESSION_TTL_SECONDS = 3600
 MIN_SESSION_SECRET_BYTES = 32
+PASSWORD_MIN_LENGTH = 12
+PASSWORD_MAX_LENGTH = 1024
+SCRYPT_N = 2**14
+SCRYPT_R = 8
+SCRYPT_P = 1
+SCRYPT_MAX_MEMORY_BYTES = 64 * 1024 * 1024
+SCRYPT_SALT_BYTES = 16
+SCRYPT_DIGEST_BYTES = 64
 
 
 def validate_session_secret(secret: str | None) -> str:
@@ -20,27 +28,59 @@ def validate_session_secret(secret: str | None) -> str:
 
 
 def hash_password(password: str) -> str:
-    if len(password) < 12:
-        raise ValueError("Password must contain at least 12 characters.")
-    salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
-    return f"scrypt$16384$8$1${_encode(salt)}${_encode(digest)}"
+    if not isinstance(password, str) or not PASSWORD_MIN_LENGTH <= len(password) <= PASSWORD_MAX_LENGTH:
+        raise ValueError(
+            f"Password must contain between {PASSWORD_MIN_LENGTH} and {PASSWORD_MAX_LENGTH} characters."
+        )
+    salt = secrets.token_bytes(SCRYPT_SALT_BYTES)
+    digest = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=salt,
+        n=SCRYPT_N,
+        r=SCRYPT_R,
+        p=SCRYPT_P,
+        maxmem=SCRYPT_MAX_MEMORY_BYTES,
+        dklen=SCRYPT_DIGEST_BYTES,
+    )
+    return (
+        f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}"
+        f"${_encode(salt)}${_encode(digest)}"
+    )
 
 
 def verify_password(password: str, encoded: str) -> bool:
     try:
-        algorithm, n, r, p, salt, expected = encoded.split("$")
-        if algorithm != "scrypt":
+        if (
+            not isinstance(password, str)
+            or len(password) > PASSWORD_MAX_LENGTH
+            or not isinstance(encoded, str)
+            or len(encoded) > 512
+        ):
+            return False
+        algorithm, n_text, r_text, p_text, salt_text, expected_text = encoded.split("$")
+        # Parameters are fixed by this application. Never execute scrypt with
+        # database-supplied work factors that could exhaust CPU or memory.
+        if (
+            algorithm != "scrypt"
+            or (n_text, r_text, p_text)
+            != (str(SCRYPT_N), str(SCRYPT_R), str(SCRYPT_P))
+        ):
+            return False
+        salt = _decode(salt_text)
+        expected = _decode(expected_text)
+        if len(salt) != SCRYPT_SALT_BYTES or len(expected) != SCRYPT_DIGEST_BYTES:
             return False
         actual = hashlib.scrypt(
-            password.encode(),
-            salt=_decode(salt),
-            n=int(n),
-            r=int(r),
-            p=int(p),
+            password.encode("utf-8"),
+            salt=salt,
+            n=SCRYPT_N,
+            r=SCRYPT_R,
+            p=SCRYPT_P,
+            maxmem=SCRYPT_MAX_MEMORY_BYTES,
+            dklen=SCRYPT_DIGEST_BYTES,
         )
-        return hmac.compare_digest(actual, _decode(expected))
-    except (ValueError, TypeError, OverflowError, binascii.Error):
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError, OverflowError, MemoryError, binascii.Error):
         return False
 
 

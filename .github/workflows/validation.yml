@@ -1,0 +1,64 @@
+name: WURI validation
+
+'on':
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - 'security/**'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-test.txt
+      - name: Compile Python source and tests
+        run: python -m compileall -q backend/app backend/tests
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m unittest discover -s tests -v
+
+  frontend-validation:
+    name: Frontend lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        working-directory: university-ranking-dss
+        run: npm ci
+      - name: Run npm security audit
+        working-directory: university-ranking-dss
+        run: npm audit --audit-level=moderate
+      - name: Run ESLint
+        working-directory: university-ranking-dss
+        run: npm run lint
+      - name: Build frontend
+        working-directory: university-ranking-dss
+        run: npm run build
+

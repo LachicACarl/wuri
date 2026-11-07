@@ -13,7 +13,9 @@ from fastapi import Cookie, FastAPI, File, Form, HTTPException, Query, Request, 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-from .document_processing import extract_blocks, segment_blocks
+from .document_processing import (
+    ParserWorkerUnavailableError, extract_blocks_isolated, segment_blocks,
+)
 from .malware_scanning import configured_malware_scanner
 from .database import Database
 from .experiment_runner import ResearchExperimentRunner, has_local_sentence_transformer_artifact
@@ -30,21 +32,24 @@ from .security import (
     read_session_claims, validate_session_secret, verify_password,
 )
 from .storage import PrivateStorage
+from .request_limits import RequestBodyLimitMiddleware
+from .cors_config import configured_cors_origins
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 app = FastAPI(title="WURI Ranking Readiness API")
+# The last middleware registered is outermost in Starlette. Keep CORS outside
+# the request guard so approved origins retain CORS headers on 413 responses.
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=MAX_UPLOAD_BYTES + 1024 * 1024,
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=configured_cors_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type"],
     expose_headers=["Content-Type"],
 )
@@ -55,8 +60,8 @@ malware_scanner = configured_malware_scanner()
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=1024)
 
 
 class InstitutionRequest(BaseModel):
@@ -500,6 +505,18 @@ async def _read_upload_limited(file: UploadFile) -> bytes:
     return b"".join(chunks)
 
 
+def _delete_temporary_upload(storage_key: str | None) -> None:
+    """Best-effort cleanup that must never hide the original upload failure."""
+    if not storage_key:
+        return
+    try:
+        storage.delete(storage_key)
+    except Exception:
+        # Cleanup must not replace the original upload failure. Deployments
+        # should separately alert on orphaned objects and reconcile private storage.
+        pass
+
+
 @app.post("/api/upload")
 async def upload_document(
     file: UploadFile = File(...),
@@ -536,93 +553,115 @@ async def upload_document(
     _validate_upload_content(extension, content)
 
     storage_key = None
+    checksum = None
     try:
         storage_key, checksum = storage.save(content, extension)
+    except OSError as error:
+        raise HTTPException(
+            status_code=503, detail="Private document storage is unavailable."
+        ) from error
+
+    try:
         scan = malware_scanner.scan(storage.root / storage_key)
-        if scan.status == "infected":
-            raise HTTPException(status_code=422, detail="The uploaded document failed malware scanning.")
-        if scan.status != "clean":
-            raise HTTPException(status_code=503, detail="Malware scanning is unavailable.")
-        blocks = extract_blocks(filename, content)
-    except HTTPException:
-        if storage_key:
-            storage.delete(storage_key)
-        raise
+    except Exception as error:
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(
+            status_code=503, detail="Malware scanning is unavailable."
+        ) from error
+
+    if scan.status == "infected":
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(status_code=422, detail="The uploaded document failed malware scanning.")
+    if scan.status != "clean":
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(status_code=503, detail="Malware scanning is unavailable.")
+
+    try:
+        blocks = extract_blocks_isolated(filename, content)
+    except ParserWorkerUnavailableError as error:
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(
+            status_code=503, detail="The document parsing service is unavailable."
+        ) from error
     except Exception as error:
         # Parser libraries can raise format-specific exceptions outside the
         # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
-        if storage_key:
-            try:
-                storage.delete(storage_key)
-            except OSError:
-                pass
+        _delete_temporary_upload(storage_key)
         raise HTTPException(
             status_code=422, detail="The document could not be extracted."
         ) from error
 
     if not blocks:
-        if storage_key:
-            storage.delete(storage_key)
+        _delete_temporary_upload(storage_key)
         raise HTTPException(status_code=422, detail="The document contains no extractable text.")
 
-    document_id = str(uuid4())
-    if not assessment_id:
-        assessment_id = database.create_assessment(user["id"], institution_id, "document_extracted")
-    passages = segment_blocks(blocks, document_id, filename)
-    warnings = []
-    matches = []
-    model_path = os.getenv("WURI_SBERT_MODEL_PATH")
-    model_artifact_available = has_local_sentence_transformer_artifact(model_path)
-    if model_artifact_available:
-        try:
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer(model_path, local_files_only=True)
-            matches = retrieve_matches(passages, model=model)
-        except (ImportError, OSError, RuntimeError, ValueError):
-            model_artifact_available = False
-            warnings.append("Semantic retrieval is unavailable; the configured local model artifact could not be loaded.")
-    else:
-        warnings.append("Semantic retrieval is unavailable; no valid local model artifact is configured.")
-
-    assessment_status = determine_status(
-        has_passages=bool(passages),
-        has_matches=bool(matches),
-        model_artifact_available=model_artifact_available,
-    )
-    document = {
-        "document_id": document_id,
-        "filename": filename,
-        "file_type": extension.lstrip("."),
-        "file_size": len(content),
-        "checksum": checksum,
-        "storage_key": storage_key,
-        "extraction_status": "success",
-        "title": title or filename,
-        "source_reference": source_reference,
-        "collection_date": collection_date,
-        "reporting_period": reporting_period,
-        "provenance": provenance,
-        "limitations": limitations,
-        "authorization_status": "unknown",
-        "research_permission_status": "unknown",
-        "malware_scan_status": scan.status,
-        "malware_scanned_at": datetime.now(timezone.utc).isoformat(),
-        "malware_scanner": scan.scanner,
-        "mapping": (
-            {"framework_id": framework_id, "framework_edition": framework_edition,
-             "criterion_id": criterion_id}
-            if framework_id else None
-        ),
-    }
+    created_assessment = False
     try:
-        database.persist_document(user["id"], institution_id, assessment_id, document,
-                                  [passage.as_dict() for passage in passages],
-                                  [match.as_dict() for match in matches])
-    except (PermissionError, OSError, ValueError) as error:
-        if storage_key:
-            storage.delete(storage_key)
-        database.remove_empty_assessment(user["id"], assessment_id)
-        raise HTTPException(status_code=500, detail="The document could not be persisted.") from error
+        document_id = str(uuid4())
+        if not assessment_id:
+            assessment_id = database.create_assessment(user["id"], institution_id, "document_extracted")
+            created_assessment = True
+        passages = segment_blocks(blocks, document_id, filename)
+        warnings = []
+        matches = []
+        model_path = os.getenv("WURI_SBERT_MODEL_PATH")
+        model_artifact_available = has_local_sentence_transformer_artifact(model_path)
+        if model_artifact_available:
+            try:
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(model_path, local_files_only=True)
+                matches = retrieve_matches(passages, model=model)
+            except Exception:
+                model_artifact_available = False
+                warnings.append("Semantic retrieval is unavailable; the configured local model artifact could not be loaded.")
+        else:
+            warnings.append("Semantic retrieval is unavailable; no valid local model artifact is configured.")
+
+        assessment_status = determine_status(
+            has_passages=bool(passages),
+            has_matches=bool(matches),
+            model_artifact_available=model_artifact_available,
+        )
+        document = {
+            "document_id": document_id,
+            "filename": filename,
+            "file_type": extension.lstrip("."),
+            "file_size": len(content),
+            "checksum": checksum,
+            "storage_key": storage_key,
+            "extraction_status": "success",
+            "title": title or filename,
+            "source_reference": source_reference,
+            "collection_date": collection_date,
+            "reporting_period": reporting_period,
+            "provenance": provenance,
+            "limitations": limitations,
+            "authorization_status": "unknown",
+            "research_permission_status": "unknown",
+            "malware_scan_status": scan.status,
+            "malware_scanned_at": datetime.now(timezone.utc).isoformat(),
+            "malware_scanner": scan.scanner,
+            "mapping": (
+                {"framework_id": framework_id, "framework_edition": framework_edition,
+                 "criterion_id": criterion_id}
+                if framework_id else None
+            ),
+        }
+        database.persist_document(
+            user["id"], institution_id, assessment_id, document,
+            [passage.as_dict() for passage in passages],
+            [match.as_dict() for match in matches],
+        )
+    except Exception as error:
+        _delete_temporary_upload(storage_key)
+        if created_assessment and assessment_id:
+            try:
+                database.remove_empty_assessment(user["id"], assessment_id)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=500, detail="The document could not be persisted."
+        ) from error
 
     return {
         "document": {

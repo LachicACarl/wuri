@@ -1,0 +1,6 @@
+fastapi
+httpx
+python-multipart
+PyMuPDF
+python-docx
+scipy>=1.14

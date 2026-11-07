@@ -1,8 +1,13 @@
 from dataclasses import dataclass
 from io import BytesIO
+import json
+import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
+import subprocess
+import sys
 import re
 import zipfile
+import zlib
 from typing import Iterable
 
 import docx
@@ -22,6 +27,10 @@ MAX_DOCX_ENTRY_BYTES = 20 * 1024 * 1024
 MAX_DOCX_COMPRESSION_RATIO = 100
 MAX_DOCX_TEXT_CHARS = 5_000_000
 MAX_TEXT_CHARS = 5_000_000
+
+
+class ParserWorkerUnavailableError(RuntimeError):
+    """The isolated parser process could not be started safely."""
 
 
 @dataclass(frozen=True)
@@ -84,9 +93,10 @@ def _validate_docx_archive(content: bytes) -> None:
                 windows_path = PureWindowsPath(name)
                 if (
                     not name or name.startswith(("/", "\\\\"))
-                    or "\\\\" in name or path.is_absolute()
+                    or "\\" in name or path.is_absolute()
                     or windows_path.is_absolute() or windows_path.drive
                     or any(part in {"", ".", ".."} for part in path.parts)
+                    or any(part in {"", ".", ".."} for part in windows_path.parts)
                 ):
                     raise ValueError("DOCX package contains an unsafe archive path.")
                 if name in names:
@@ -125,6 +135,8 @@ def _validate_docx_archive(content: bytes) -> None:
                         raise ValueError("DOCX package entry exceeds its declared size.")
     except zipfile.BadZipFile as error:
         raise ValueError("The DOCX package is not a valid ZIP archive.") from error
+    except (OSError, RuntimeError, EOFError, zlib.error) as error:
+        raise ValueError("The DOCX package is malformed or unreadable.") from error
 
 
 def validate_content(filename: str, content: bytes) -> None:
@@ -138,7 +150,10 @@ def validate_content(filename: str, content: bytes) -> None:
                     raise ValueError("PDF exceeds the maximum page count.")
                 if document.is_encrypted:
                     raise ValueError("Password-protected PDF files are not supported.")
-        except (fitz.FileDataError, fitz.EmptyFileError) as error:
+        except ValueError:
+            raise
+        except Exception as error:
+            # MuPDF parser exceptions vary across supported PyMuPDF releases.
             raise ValueError("The PDF file is malformed or unreadable.") from error
     elif extension == ".docx":
         if not content.startswith(b"PK"):
@@ -242,6 +257,78 @@ def extract_blocks(filename: str, content: bytes) -> list[ExtractedBlock]:
     if extension == ".txt":
         return _extract_txt(content)
     raise ValueError("Unsupported document format.")
+
+
+def extract_blocks_isolated(
+    filename: str,
+    content: bytes,
+    timeout_seconds: float = 25,
+) -> list[ExtractedBlock]:
+    """Parse a document in a separate, time-limited worker process.
+
+    POSIX workers apply CPU, address-space, file-descriptor, and core-dump
+    limits before importing PDF/DOCX parser libraries. Windows development
+    uses the wall-clock timeout; deployment readiness remains blocked unless
+    the POSIX resource limits or an equivalent platform sandbox are present.
+    """
+    if len(content) > 25 * 1024 * 1024:
+        raise ValueError("Document exceeds the parser worker input limit.")
+
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {
+            "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR",
+            "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "LANG", "LC_ALL",
+        }
+    }
+    environment["PYTHONIOENCODING"] = "utf-8"
+    backend_root = Path(__file__).resolve().parents[1]
+    command = [
+        sys.executable, "-m", "app.document_parser_worker", filename,
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            input=content,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            cwd=backend_root,
+            env=environment,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise TimeoutError("Document parsing exceeded the execution time limit.") from error
+    except OSError as error:
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser could not be started."
+        ) from error
+
+    try:
+        result = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser returned an invalid response."
+        ) from error
+
+    if completed.returncode != 0:
+        message = result.get("error", "The isolated document parser failed.")
+        if result.get("error_type") == "ValueError":
+            raise ValueError(message)
+        if result.get("error_type") == "WorkerLimitsUnavailable":
+            raise ParserWorkerUnavailableError(message)
+        raise RuntimeError(message)
+
+    if os.name == "posix" and result.get("resource_limits_applied") is not True:
+        raise ParserWorkerUnavailableError("Parser worker resource limits were not applied.")
+
+    try:
+        return [ExtractedBlock(**block) for block in result["blocks"]]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ParserWorkerUnavailableError(
+            "The isolated document parser returned invalid blocks."
+        ) from error
 
 
 def _split_long_text(text: str, max_chars: int, overlap_chars: int) -> Iterable[str]:

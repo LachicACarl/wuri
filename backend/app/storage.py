@@ -1,6 +1,7 @@
 import hashlib
 import os
 from pathlib import Path
+import tempfile
 import uuid
 
 
@@ -12,8 +13,24 @@ class PrivateStorage:
     def save(self, content: bytes, extension: str) -> tuple[str, str]:
         key = f"{uuid.uuid4()}{extension}"
         destination = self.root / key
-        destination.write_bytes(content)
-        return key, hashlib.sha256(content).hexdigest()
+        checksum = hashlib.sha256(content).hexdigest()
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".wuri-upload-", suffix=".tmp", dir=self.root
+        )
+        temporary_path = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, destination)
+        except Exception:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        return key, checksum
 
     def delete(self, key: str):
         candidate = (self.root / key).resolve()
