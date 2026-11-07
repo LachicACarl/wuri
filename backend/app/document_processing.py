@@ -94,6 +94,8 @@ def _validate_docx_archive(content: bytes) -> None:
                     raise ValueError("Encrypted DOCX archive entries are not supported.")
                 if entry.file_size < 0 or entry.compress_size < 0:
                     raise ValueError("DOCX package contains invalid archive metadata.")
+                if entry.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
+                    raise ValueError("DOCX package uses an unsupported compression method.")
                 if entry.file_size > MAX_DOCX_ENTRY_BYTES:
                     raise ValueError("DOCX archive entry exceeds the uncompressed size limit.")
                 total_uncompressed += entry.file_size
