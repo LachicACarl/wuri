@@ -69,11 +69,12 @@ These are not completed:
 
 1. Independent dependency provenance review for `university-ranking-dss/package.json` and all referenced tooling; regenerate a reviewed lockfile only after authorization.
 2. Confirm whether any root-level package manifest exists; the current clean-root tree has only `university-ranking-dss/package.json`.
-3. Server-side authentication/session contract and authorization model review.
-4. Assessment API contract review; the proposed endpoint is not implemented and the current frontend does not send uploads.
-5. PostgreSQL schema/migration/rollback design review, if formally approved.
+3. Finalize and approve the server-side authentication/session policy, including provider/issuer identity mapping, session lifetimes, revocation, and propagation behavior.
+4. Finalize and approve the asynchronous assessment API contract, including acceptance/completion lifecycle, status model, idempotency, typed errors, provenance, and completed-result schema; the proposed endpoint is not implemented and the current frontend does not send uploads.
+5. Finalize database state machines, idempotency constraints, version registries, identity mapping, and retention/deletion semantics before any physical schema or migration design.
 6. Private document storage access, retention, and recovery design review, if formally approved.
 7. Isolated testing with synthetic data only after explicit AUTH-02 through AUTH-04 authorization.
+8. Research-method approval that specifies framework indicators, score units/ranges, aggregation rules, missing-data behavior, model versions, validation partitions, and permitted claims before any scoring implementation.
 
 ## 6. Current disposition
 
