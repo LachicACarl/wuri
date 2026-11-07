@@ -54,3 +54,8 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 5. Keep production, real institutional data, database writes, and deployment separately gated.
 
 **Conclusion:** This review found no new executable defect that can responsibly be confirmed without running the project. It did find and correct stale documentation in this branch. The application itself remains intentionally unavailable. 
+
+
+## Review package / pull-request comparison note — 2026-11-07
+
+PR #2 currently compares the clean-root snapshot with an identical-base snapshot and therefore shows only `REVIEW-ONLY.md`. It does not contain the full source remediation diff. Reviewers must inspect the clean-root branch directly at the exact snapshot commit named in that index. The draft PR is a reviewer handoff, not a complete source-change PR. Do not merge it into `main`.
