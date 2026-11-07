@@ -57,6 +57,32 @@ class RequestBodyLimitTests(unittest.TestCase):
         self.assertEqual(messages[0]["status"], 413)
         self.assertIn(b"configured limit", messages[1]["body"])
 
+    def test_early_rejection_includes_cors_headers_for_browser_origin(self):
+        messages = []
+
+        async def application(scope, receive, send):
+            self.fail("Oversized request must be rejected before application.")
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            messages.append(message)
+
+        middleware = RequestBodyLimitMiddleware(application, max_body_bytes=4)
+        asyncio.run(middleware(
+            {"type": "http", "headers": [
+                (b"content-length", b"5"),
+                (b"origin", b"http://localhost:5173"),
+            ]},
+            receive,
+            send,
+        ))
+        headers = dict(messages[0]["headers"])
+        self.assertEqual(messages[0]["status"], 413)
+        self.assertEqual(headers[b"access-control-allow-origin"], b"http://localhost:5173")
+        self.assertEqual(headers[b"access-control-allow-credentials"], b"true")
+
     def test_non_http_scope_passes_through_without_body_inspection(self):
         called = False
 
