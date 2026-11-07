@@ -37,6 +37,11 @@ SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 app = FastAPI(title="WURI Ranking Readiness API")
 app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=MAX_UPLOAD_BYTES + 1024 * 1024,
+)
+
+app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
@@ -48,11 +53,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
     expose_headers=["Content-Type"],
-)
-
-app.add_middleware(
-    RequestBodyLimitMiddleware,
-    max_body_bytes=MAX_UPLOAD_BYTES + 1024 * 1024,
 )
 
 database = Database()
