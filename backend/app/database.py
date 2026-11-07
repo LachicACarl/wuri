@@ -95,6 +95,96 @@ class Database:
                 (username.strip().lower(),),
             ).fetchone()
 
+    def create_session(self, session_id: str, user_id: str, expires_at: int):
+        import time
+        with self.connection() as connection:
+            connection.execute(
+                """INSERT INTO auth_sessions (session_id, user_id, created_at, expires_at)
+                   VALUES (?, ?, ?, ?)""",
+                (session_id, user_id, int(time.time()), int(expires_at)),
+            )
+
+    def session_is_active(self, session_id: str, user_id: str, now: int | None = None) -> bool:
+        import time
+        timestamp = int(time.time()) if now is None else int(now)
+        with self.connection() as connection:
+            return connection.execute(
+                """SELECT 1 FROM auth_sessions
+                   WHERE session_id = ? AND user_id = ? AND revoked_at IS NULL
+                     AND expires_at > ?""",
+                (session_id, user_id, timestamp),
+            ).fetchone() is not None
+
+    def revoke_session(self, session_id: str, now: int | None = None) -> bool:
+        import time
+        timestamp = int(time.time()) if now is None else int(now)
+        with self.connection() as connection:
+            cursor = connection.execute(
+                """UPDATE auth_sessions SET revoked_at = ?
+                   WHERE session_id = ? AND revoked_at IS NULL""",
+                (timestamp, session_id),
+            )
+            return cursor.rowcount == 1
+
+    def login_rate_limit_status(self, rate_key: str, now: int | None = None) -> int:
+        import time
+        timestamp = int(time.time()) if now is None else int(now)
+        window_seconds = 900
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT window_started_at, locked_until FROM login_rate_limits WHERE rate_key = ?",
+                (rate_key,),
+            ).fetchone()
+            if not row:
+                return 0
+            if row["window_started_at"] + window_seconds <= timestamp:
+                connection.execute("DELETE FROM login_rate_limits WHERE rate_key = ?", (rate_key,))
+                return 0
+            if row["locked_until"] is not None and row["locked_until"] > timestamp:
+                return row["locked_until"] - timestamp
+            return 0
+
+    def record_login_failure(
+        self, rate_key: str, now: int | None = None, max_attempts: int = 5,
+        window_seconds: int = 900,
+    ) -> int:
+        import time
+        timestamp = int(time.time()) if now is None else int(now)
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """SELECT window_started_at, failed_attempts, locked_until
+                   FROM login_rate_limits WHERE rate_key = ?""",
+                (rate_key,),
+            ).fetchone()
+            if row and row["locked_until"] is not None and row["locked_until"] > timestamp:
+                return row["locked_until"] - timestamp
+            if not row or row["window_started_at"] + window_seconds <= timestamp:
+                window_started = timestamp
+                attempts = 1
+                locked_until = None
+            else:
+                window_started = row["window_started_at"]
+                attempts = row["failed_attempts"] + 1
+                locked_until = row["locked_until"]
+            if attempts >= max_attempts:
+                locked_until = timestamp + window_seconds
+            connection.execute(
+                """INSERT INTO login_rate_limits
+                   (rate_key, window_started_at, failed_attempts, locked_until)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(rate_key) DO UPDATE SET
+                     window_started_at = excluded.window_started_at,
+                     failed_attempts = excluded.failed_attempts,
+                     locked_until = excluded.locked_until""",
+                (rate_key, window_started, attempts, locked_until),
+            )
+            return max(0, locked_until - timestamp) if locked_until else 0
+
+    def clear_login_failures(self, rate_key: str):
+        with self.connection() as connection:
+            connection.execute("DELETE FROM login_rate_limits WHERE rate_key = ?", (rate_key,))
+
     def memberships(self, user_id: str):
         with self.connection() as connection:
             return connection.execute(
