@@ -4,7 +4,8 @@ This repository currently contains a quarantined React/Vite frontend snapshot in
 
 ## Frontend location
 
-- Application entry: `university-ranking-dss/src/main.jsx`
+- Static hold page: `university-ranking-dss/index.html` (self-contained HTML/CSS; no React module is loaded)
+- Orphaned React component: `university-ranking-dss/src/App.jsx` (not mounted; `src/main.jsx` is absent)
 - Main routes and views: `university-ranking-dss/src/App.jsx`
 - Vite configuration: `university-ranking-dss/vite.config.js`
 - Dependencies: `university-ranking-dss/package.json`
@@ -19,7 +20,7 @@ The manifest contains development/build/lint/preview scripts, but these are not 
 - The current clean-root snapshot contains a declarative Vite configuration without the previously identified obfuscated loader. The original suspicious commit remains preserved in `main` history for independent investigation.
 - The clean-root snapshot contains no tracked `node_modules/` directory. Dependencies must be independently reviewed and a lockfile generated only after explicit authorization.
 - A root `.gitignore` excludes dependency directories, build output, local environment files, and logs.
-- The current `src/App.jsx` contains only a static security-hold screen. It has no upload control, API request, result renderer, session state, scoring constants, or Supabase client.
+- The current `index.html` directly renders a static security-hold page. It has no module script or React mount. `src/App.jsx` contains a hold-screen component but is not loaded; `src/main.jsx` is absent from the tracked tree. Neither file provides an operational application.
 - Do not use this snapshot to upload documents or enter credentials. Authentication and all operational features are unavailable.
 
 ## Assessment integrity
@@ -72,4 +73,4 @@ Until written security clearance and separate implementation/runtime authorizati
 
 ## Current implementation boundary
 
-Only the static React security-hold screen is present in this branch. The proposal documents describe future work and must not be treated as implemented services. The frontend contains no live backend, login, upload, scoring, or Supabase operations. This branch is not approved for production use.
+Only a standalone static HTML/CSS security-hold page is active in this branch; the React component is unmounted and no React entry module is tracked. The proposal documents describe future work and must not be treated as implemented services. The frontend contains no live backend, login, upload, scoring, or Supabase operations. This branch is not approved for production use.
