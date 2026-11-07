@@ -38,6 +38,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 - Confirmed the package manifest has dev/build/lint/preview scripts but no test script; the current tree contains no test source files.
 - Confirmed proposed design documents are not implementation artifacts.
 - Confirmed the `main` ref has not been changed by this review.
+- Confirmed the source-review branch head at this check is recorded in the GitHub ref; this report should be reviewed together with the live branch, not treated as a pinned immutable snapshot.
 
 ## Checks not performed — do not interpret as passed
 
@@ -56,6 +57,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 3. Obtain explicit authorization naming the exact clean-root branch/commit, isolated environment, permitted dependency install and test commands, data class, and stop conditions.
 4. Only after authorization, resolve the declared toolchain against an approved runtime version, review peer-dependency compatibility and advisories, restore dependencies from an independently reviewed lockfile, then run lint/build and add an authorized test suite before claiming test coverage.
 5. Keep production, real institutional data, database writes, and deployment separately gated.
+6. Re-verify the current branch SHA before external review; the snapshot branch may advance after this report.
 
 **Conclusion:** This review found no new executable defect that can responsibly be confirmed without running the project. It did find and correct stale documentation in this branch. The application itself remains intentionally unavailable. 
 
