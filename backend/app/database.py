@@ -137,11 +137,11 @@ class Database:
             ).fetchone()
             if not row:
                 return 0
+            if row["locked_until"] is not None and row["locked_until"] > timestamp:
+                return row["locked_until"] - timestamp
             if row["window_started_at"] + window_seconds <= timestamp:
                 connection.execute("DELETE FROM login_rate_limits WHERE rate_key = ?", (rate_key,))
                 return 0
-            if row["locked_until"] is not None and row["locked_until"] > timestamp:
-                return row["locked_until"] - timestamp
             return 0
 
     def record_login_failure(
