@@ -60,6 +60,7 @@ def build_readiness_report() -> dict[str, Any]:
             (3, "research_execution"), (4, "research_import_and_annotations"),
             (5, "five_expert_panel"), (6, "institution_registry_readiness"),
             (7, "secure_evidence_provenance"), (8, "malware_scan_state"),
+            (9, "auth_sessions_and_login_limits"),
         )}
         missing = required - migrations
         checks.append(_check(
