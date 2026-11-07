@@ -13,7 +13,9 @@ from fastapi import Cookie, FastAPI, File, Form, HTTPException, Query, Request, 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-from .document_processing import extract_blocks_isolated, segment_blocks
+from .document_processing import (
+    ParserWorkerUnavailableError, extract_blocks_isolated, segment_blocks,
+)
 from .malware_scanning import configured_malware_scanner
 from .database import Database
 from .experiment_runner import ResearchExperimentRunner, has_local_sentence_transformer_artifact
@@ -579,6 +581,11 @@ async def upload_document(
 
     try:
         blocks = extract_blocks_isolated(filename, content)
+    except ParserWorkerUnavailableError as error:
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(
+            status_code=503, detail="The document parsing service is unavailable."
+        ) from error
     except Exception as error:
         # Parser libraries can raise format-specific exceptions outside the
         # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
