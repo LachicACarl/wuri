@@ -144,6 +144,7 @@ const GOVERNANCE_ROWS = [
 
 
 const checklistGroups = [
+  // These are proposed project requirements, not completed feature claims.
   {
     title: 'Document Integration & Management',
     icon: Database,
@@ -625,8 +626,8 @@ const ExplainableAI = ({ evaluation }) => {
 const ChecklistView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Checklist Compliance</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Each required feature is represented in the prototype as a visible workflow, algorithm panel, metadata field, or validation control.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Proposed Requirements Checklist</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">This is a design checklist, not evidence of completed implementation. Items below describe intended capabilities and still require engineering, security review, and testing.</p>
     </div>
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       {checklistGroups.map(({ title, icon: Icon, items }) => (
@@ -635,7 +636,7 @@ const ChecklistView = () => (
           <div className="space-y-3">
             {items.map(([name, description]) => (
               <div key={name} className="flex gap-3 rounded-lg bg-slate-50 p-3">
-                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={18} />
+                <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={18} />
                 <div>
                   <div className="text-sm font-black text-slate-800">{name}</div>
                   <div className="mt-1 text-sm text-slate-500">{description}</div>
@@ -652,8 +653,8 @@ const ChecklistView = () => (
 const ArchitectureView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">System Architecture & Traceability</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Structure follows the dissertation modules from document intake through dashboard reporting, with each module tied to a verifiable output.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Proposed System Architecture</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">The modules below describe the target design. They are not deployed services or verified data flows in the current frontend-only repository.</p>
     </div>
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
       {ARCHITECTURE_MODULES.map(([module, output], index) => (
@@ -666,7 +667,7 @@ const ArchitectureView = () => (
     </div>
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><KeyRound size={20} /> Role-Based Access Control</h3>
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><KeyRound size={20} /> Proposed Role Model — Not Enforced</h3>
         <div className="space-y-3">
           {GOVERNANCE_ROWS.map(([role, permission]) => (
             <div key={role} className="rounded-lg bg-slate-50 p-3">
@@ -677,7 +678,7 @@ const ArchitectureView = () => (
         </div>
       </div>
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Report Artifacts</h3>
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950"><TableProperties size={20} /> Planned Report Artifacts</h3>
         <div className="space-y-3 text-sm font-semibold text-slate-600">
           <div className="rounded-lg bg-slate-50 p-3">Requirements traceability matrix and module verification log</div>
           <div className="rounded-lg bg-slate-50 p-3">Evidence table with source, date, page, section, framework, indicator, AES, and acceptance status</div>
@@ -692,8 +693,8 @@ const ArchitectureView = () => (
 const ValidationView = () => (
   <section className="space-y-6 p-6 lg:p-8">
     <div>
-      <h2 className="text-3xl font-black tracking-normal text-slate-950">Validation, Testing & QA</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-500">Validation coverage follows baseline comparison, ablation, expert agreement, robustness, and ISO/IEC 25010 quality characteristics.</p>
+      <h2 className="text-3xl font-black tracking-normal text-slate-950">Proposed Validation Plan — Not Executed</h2>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">The table lists planned evaluation activities. No baseline, ablation, expert-agreement, robustness, or ISO/IEC 25010 tests have been run in this recovery snapshot.</p>
     </div>
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -710,7 +711,7 @@ const ValidationView = () => (
               <tr key={item}>
                 <td className="p-4 font-black text-slate-900">{item}</td>
                 <td className="p-4 text-slate-600">{implementation}</td>
-                <td className="p-4"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">Defined</span></td>
+                <td className="p-4"><span className="rounded bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">Planned</span></td>
               </tr>
             ))}
           </tbody>
