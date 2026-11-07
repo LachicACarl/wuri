@@ -166,6 +166,43 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(list(self.storage.root.iterdir()), [])
 
+    def test_upload_scanner_exception_returns_503_and_cleans_temporary_file(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                raise RuntimeError("synthetic scanner failure")
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks"
+        ) as parser:
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        parser.assert_not_called()
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
+    def test_upload_cleanup_error_does_not_mask_parser_failure(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+        ), patch.object(main.storage, "delete", side_effect=OSError("synthetic disk error")):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "The document could not be extracted.")
+
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
         user_id = self.database.user_by_username("research-admin")["id"]
