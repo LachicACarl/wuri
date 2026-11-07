@@ -3,6 +3,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import zipfile
+import zlib
 from typing import Iterable
 
 import docx
@@ -125,6 +126,8 @@ def _validate_docx_archive(content: bytes) -> None:
                         raise ValueError("DOCX package entry exceeds its declared size.")
     except zipfile.BadZipFile as error:
         raise ValueError("The DOCX package is not a valid ZIP archive.") from error
+    except (OSError, RuntimeError, EOFError, zlib.error) as error:
+        raise ValueError("The DOCX package is malformed or unreadable.") from error
 
 
 def validate_content(filename: str, content: bytes) -> None:
