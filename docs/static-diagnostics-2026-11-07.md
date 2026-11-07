@@ -15,7 +15,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 | BLOCKER | No backend/API implementation | No backend/server source tree or API route is present | Confirmed absent |
 | BLOCKER | Authentication is unavailable | No auth client, session endpoint, or server authorization exists | Confirmed absent |
 | BLOCKER | Document upload is unavailable | Current UI contains no file input, FormData, or upload request | Confirmed absent |
-| BLOCKER | Assessment pipeline is unavailable | No extraction, evidence provenance, EQAM/AES, AHP/TOPSIS, RRS/ARRS implementation exists | Confirmed absent |
+| BLOCKER | Assessment pipeline is unavailable | The current app contains no score result objects, score fields, algorithm imports, or calculation functions | Confirmed absent by static source inspection |
 | BLOCKER | Database integration is unavailable | No Supabase client, SQL migration, or DB adapter exists in this snapshot | Confirmed absent |
 | HIGH | Dependency reproducibility is incomplete | package.json exists but package-lock.json is absent | Confirmed |
 | HIGH | Runtime/build state is unknown | Dependencies are not installed; scripts have not been run | Not tested |
