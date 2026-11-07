@@ -398,7 +398,7 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(downloaded.status_code, 200)
         self.assertEqual(
             downloaded.headers["content-disposition"],
-            "attachment; filename*=UTF-8''acceptance%22bad.txt",
+            "attachment; filename*=UTF-8''acceptance%2522bad.txt",
         )
         deleted = self.client.delete(f"/api/documents/{document_id}")
         self.assertEqual(deleted.status_code, 200, deleted.text)
