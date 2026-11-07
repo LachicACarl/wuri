@@ -107,7 +107,8 @@ def build_readiness_report() -> dict[str, Any]:
     ))
     parser_limits_ready = False
     parser_limit_detail = (
-        "This platform needs an equivalent worker CPU and memory sandbox before production use."
+        "A POSIX parser worker with CPU, address-space, file-descriptor, and core-dump "
+        "limits is required; this check does not establish container isolation."
     )
     if os.name == "posix":
         try:
@@ -126,20 +127,15 @@ def build_readiness_report() -> dict[str, Any]:
                 and worker_result.get("resource_limits_applied") is True
             )
             parser_limit_detail = (
-                "A POSIX parser worker applied CPU, address-space, file-descriptor, and core-dump limits."
+                "A POSIX parser worker applied CPU, address-space, file-descriptor, and core-dump limits; "
+                "container and filesystem/network isolation remain separate mandatory checks."
                 if parser_limits_ready else
-                "The parser worker did not confirm that all resource limits were applied."
+                "The parser worker did not confirm that all process resource limits were applied."
             )
         except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError, json.JSONDecodeError):
             parser_limit_detail = (
                 "The parser worker could not be started and verified during readiness checking."
             )
-    if parser_limits_ready and os.getenv("WURI_PARSER_SANDBOX_VERIFIED", "").strip().lower() != "true":
-        parser_limits_ready = False
-        parser_limit_detail = (
-            "The worker resource limits apply, but an administrator has not verified "
-            "the deployment's parser sandbox, filesystem restrictions, and network isolation."
-        )
     checks.append(_check(
         "parser_worker_resource_limits",
         "ready" if parser_limits_ready else "blocked",
@@ -147,7 +143,9 @@ def build_readiness_report() -> dict[str, Any]:
     ))
     checks.append(_check(
         "parser_worker_container_isolation", "manual_verification_required",
-        "Process resource limits do not replace container, filesystem, and network isolation.",
+        "A process-level resource limit check cannot verify container filesystem restrictions, "
+        "network isolation, non-root execution, or deployment security context. "
+        "Verify these controls independently; do not use an environment flag as proof.",
     ))
     checks.append(_check(
         "authorization_workflow", "manual_verification_required",
