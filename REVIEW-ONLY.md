@@ -1,18 +1,40 @@
-# WURI Review-Only Branch
+# WURI Clean-Root Review Package
 
-This branch is a review base created from the clean-root quarantine snapshot. It is deliberately separate from `main` and must not be merged into `main` until the security hold in issue #1 is independently cleared.
+**Review status:** Draft / review only  
+**Snapshot branch:** `security/clean-root-quarantine-2026-11-07`  
+**Snapshot commit:** `ff22bb0f5d73d5d62402f2d4c66eab957513e698`  
+**Main branch:** must remain unchanged pending security clearance.
 
-Source snapshot: `security/clean-root-quarantine-2026-11-07`  
-Snapshot commit: `ff22bb0f5d73d5d62402f2d4c66eab957513e698`
+## Review entry points
 
-## Scope
+- [Repository overview](README.md)
+- [Frontend technology inventory](university-ranking-dss/README.md)
+- [Static system audit](docs/static-system-audit-2026-11-07.md)
+- [Static diagnostics and unperformed checks](docs/static-diagnostics-2026-11-07.md)
+- [Security hold clearance checklist](docs/security-hold-clearance-evidence-checklist.md)
+- [Connection readiness runbook](docs/connection-readiness-and-recovery-runbook.md)
+- [Proposed backend implementation plan](docs/backend-implementation-plan.md)
+- [Proposed authentication contract](docs/authentication-contract-proposed.md)
+- [Proposed assessment API contract](docs/assessment-api-contract-proposed.md)
+- [Proposed database schema](docs/database-schema-proposed.md)
 
-This review branch contains only the non-operational React security-hold screen and documentation. It does not implement backend API, authentication, document uploads, Supabase access, extraction, scoring, or persistence.
+## Current source state
 
-## Review requirements
+The snapshot contains a non-operational React/JavaScript frontend security-hold screen. It has no implemented backend, authentication, upload, private storage, document extraction, Supabase integration, assessment algorithms, or persistent history.
 
-- Review source and documentation changes.
-- Do not run the project or install packages until runtime authorization is explicitly recorded.
-- Do not connect to Supabase or process institutional data.
-- Do not merge this review line into `main` while the security hold remains open.
-- Keep credentials and secrets out of issues, commits, and pull requests.
+The proposed backend/auth/database files are design artifacts only. The dependency lockfile is absent; no dependency installation, build, lint, test, or runtime validation has been performed.
+
+## Review checklist
+
+- [ ] Independently inspect the suspicious historical Vite configuration and its provenance.
+- [ ] Assess possible prior execution on developer machines, CI, and deployment environments.
+- [ ] Confirm through the authorized Supabase owner that the exposed service-role key has been revoked and replacement custody is secure.
+- [ ] Review the exact clean-root tree and identify any residual source or dependency concerns.
+- [ ] State whether isolated implementation is approved and list permitted commands/environment.
+- [ ] Keep real institutional data, Supabase writes, production, and deployment separately gated.
+
+## Merge restriction
+
+This review package is not a request to merge into `main`. Do not merge the clean-root branch or this review branch into `main` until independent security clearance, credential containment evidence, and separate implementation/runtime authorization are documented in issue #1.
+
+No credentials, tokens, or private institutional data belong in review comments.
