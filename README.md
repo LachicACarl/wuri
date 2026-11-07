@@ -43,11 +43,13 @@ The only application dependency manifest in this snapshot is `university-ranking
 
 The following documents are proposals and review artifacts only. They are not deployed API specifications, migrations, or implemented backend features:
 
-- `docs/authentication-contract-proposed.md` — server-side identity, sessions, authorization, and browser protections.
-- `docs/database-schema-proposed.md` — logical PostgreSQL entities, tenant boundaries, provenance, and access matrix.
-- `docs/assessment-api-contract-proposed.md` — proposed future assessment API contract; no corresponding endpoint is implemented.
+- `docs/authentication-contract-proposed.md` — proposed identity/session design; provider, session lifetimes, revocation propagation, and endpoint details remain undecided.
+- `docs/database-schema-proposed.md` — logical PostgreSQL model; physical constraints, state machines, idempotency policy, identity mapping, and retention rules remain undecided.
+- `docs/assessment-api-contract-proposed.md` — illustrative asynchronous assessment API proposal; it is not a finalized response schema and no endpoint is implemented.
 - `docs/backend-implementation-plan.md` — dependency-ordered backend workstreams and authorization gates.
 - `docs/security-hold-clearance-evidence-checklist.md` — external evidence required to reconsider the security hold.
+
+All backend/auth/database documents are proposals for review, not approved specifications. No identity provider, HTTP status contract, assessment status machine, scoring formula/weight, database schema, migration, storage provider, retention period, or runtime behavior has been approved by virtue of its inclusion here.
 
 ## Recovery restrictions
 
@@ -63,7 +65,7 @@ Until written security clearance and separate implementation/runtime authorizati
 
 1. Independent review of suspicious commit provenance, behavior, and possible prior execution.
 2. Owner-confirmed revocation of the exposed Supabase service-role key and confirmation that dependent services no longer use it.
-3. Independent review of the remaining dependency manifests and lockfiles.
+3. Independent provenance review of the single frontend manifest (`university-ranking-dss/package.json`); no dependency lockfile is currently tracked.
 4. Approved server-side authentication and assessment API contracts.
 5. Separate written authorization for implementation, isolated synthetic-data testing, real-data work, and production deployment.
 
