@@ -4,6 +4,7 @@ import math
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -419,6 +420,24 @@ def _validate_upload_content(extension: str, content: bytes):
         raise HTTPException(status_code=415, detail="The uploaded file is not a valid DOCX archive.")
 
 
+async def _read_upload_limited(file: UploadFile) -> bytes:
+    """Read an upload without buffering more than the configured size limit."""
+    chunks = []
+    total = 0
+    try:
+        while True:
+            chunk = await file.read(min(1024 * 1024, MAX_UPLOAD_BYTES + 1 - total))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="The uploaded document exceeds the 25 MB limit.")
+            chunks.append(chunk)
+    finally:
+        await file.close()
+    return b"".join(chunks)
+
+
 @app.post("/api/upload")
 async def upload_document(
     file: UploadFile = File(...),
@@ -449,11 +468,9 @@ async def upload_document(
     if extension not in SUPPORTED_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Only PDF, DOCX, and TXT files are supported.")
 
-    content = await file.read()
+    content = await _read_upload_limited(file)
     if not content:
         raise HTTPException(status_code=400, detail="The uploaded document is empty.")
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="The uploaded document exceeds the 25 MB limit.")
     _validate_upload_content(extension, content)
 
     storage_key = None
@@ -595,8 +612,13 @@ def download_document(document_id: str, session: str | None = Cookie(default=Non
                FROM documents WHERE id = ?""",
             (user["id"], json.dumps({"document_id": document_id}), document_id),
         )
-    return Response(content=content, media_type="application/octet-stream",
-                    headers={"Content-Disposition": f'attachment; filename="{Path(row["filename"]).name}"'})
+    safe_filename = Path(row["filename"]).name
+    download_name = quote(safe_filename, safe="")
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{download_name}"},
+    )
 
 
 @app.get("/api/institutions/{institution_id}/documents")
