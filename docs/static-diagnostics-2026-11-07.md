@@ -17,7 +17,9 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 | BLOCKER | Document upload is unavailable | Current UI contains no file input, FormData, or upload request | Confirmed absent |
 | BLOCKER | Assessment pipeline is unavailable | The current app contains no score result objects, score fields, algorithm imports, or calculation functions | Confirmed absent by static source inspection |
 | BLOCKER | Database integration is unavailable | No Supabase client, SQL migration, or DB adapter exists in this snapshot | Confirmed absent |
-| HIGH | Dependency reproducibility is incomplete | package.json exists but package-lock.json is absent | Confirmed |
+| HIGH | Dependency reproducibility is incomplete | `university-ranking-dss/package.json` exists but no lockfile is tracked | Confirmed |
+| HIGH | Toolchain compatibility is unverified | React 18, Vite 8, `@vitejs/plugin-react` 6, ESLint 10, and Tailwind 4 are declared; package resolution and peer/runtime compatibility have not been checked because dependencies were not installed and no lockfile exists | Not tested |
+| MEDIUM | No test suite is present | Current tree contains no tracked test source or test script | Static tree/manifest observation |
 | HIGH | Runtime/build state is unknown | Dependencies are not installed; scripts have not been run | Not tested |
 | HIGH | Security approval is pending | Issue #1 has no independent reviewer or authorized Supabase-owner approval comment | Pending |
 | HIGH | Exposed credential containment is unverified | No owner confirmation of revocation/replacement is recorded | Pending |
@@ -32,6 +34,8 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 - Confirmed there is no TypeScript source, Python source, backend directory, Supabase client import, upload handler, file input, or score computation in the current app source.
 - Confirmed HTML metadata title, description, and noindex directive are present.
 - Confirmed the dependency lockfile and node_modules are absent.
+- Read the package manifest and noted declared React/Vite/ESLint/Tailwind major versions; compatibility is intentionally unverified because no dependency installation or package-manager resolution was performed.
+- Confirmed the package manifest has dev/build/lint/preview scripts but no test script; the current tree contains no test source files.
 - Confirmed proposed design documents are not implementation artifacts.
 - Confirmed the `main` ref has not been changed by this review.
 
@@ -50,7 +54,7 @@ The current branch is a quarantined React/Vite frontend snapshot. The applicatio
 1. Obtain independent written review of the suspicious historical Vite configuration and possible prior execution.
 2. Obtain written confirmation from the authorized Supabase owner that the exposed service-role key is revoked and replacement credentials are stored securely.
 3. Obtain explicit authorization naming the exact clean-root branch/commit, isolated environment, permitted dependency install and test commands, data class, and stop conditions.
-4. Only after authorization, restore dependencies from an independently reviewed lockfile, then run lint/build/tests and investigate actual tool-reported errors.
+4. Only after authorization, resolve the declared toolchain against an approved runtime version, review peer-dependency compatibility and advisories, restore dependencies from an independently reviewed lockfile, then run lint/build and add an authorized test suite before claiming test coverage.
 5. Keep production, real institutional data, database writes, and deployment separately gated.
 
 **Conclusion:** This review found no new executable defect that can responsibly be confirmed without running the project. It did find and correct stale documentation in this branch. The application itself remains intentionally unavailable. 
