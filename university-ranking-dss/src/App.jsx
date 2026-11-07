@@ -149,60 +149,60 @@ const checklistGroups = [
     icon: Database,
     items: [
       ['Institutional collection', 'Strategic plans, reports, publications, faculty profiles, sustainability, extension, and policies are represented as document classes.'],
-      ['Screening and metadata', 'Upload workflow tracks source, date, type, file size, page/section, extraction status, and verification status.'],
-      ['Secure knowledge base', 'Role-based access control is represented through administrator, evaluator, and viewer permissions.'],
+      ['Screening and metadata', 'Planned workflow fields include source, date, type, file size, page/section, extraction status, and verification status. Upload tracking is not implemented.'],
+      ['Secure knowledge base', 'Administrator, evaluator, and viewer roles are proposed. Server-side role enforcement and a secure knowledge base are not implemented.'],
     ],
   },
   {
     title: 'Semantic Evidence Extraction & Matching',
     icon: Brain,
     items: [
-      ['Enhanced Sentence-BERT', 'Domain-adapted SBERT is modeled as the embedding engine for sentence-level semantic similarity.'],
-      ['Framework mapping', 'Evidence is mapped to WURI, THE, QS, and UI GreenMetric indicators.'],
-      ['Top-K retrieval', 'The app ranks evidence passages and exposes the top evidence candidates with dataset split metadata.'],
+      ['Enhanced Sentence-BERT', 'Domain-adapted SBERT is a proposed model component. No embedding model or inference pipeline is included in this frontend.'],
+      ['Framework mapping', 'Mapping evidence to WURI, THE, QS, and UI GreenMetric indicators is a planned capability; no mapping engine is implemented.'],
+      ['Top-K retrieval', 'Top-K retrieval and dataset split tracking are planned capabilities; no retrieval pipeline is implemented.'],
     ],
   },
   {
     title: 'Evidence Quality Assessment Mechanism',
     icon: ShieldCheck,
     items: [
-      ['Five EQAM dimensions', 'Semantic relevance, model confidence, completeness, source reliability, and evidence strength are scored.'],
-      ['Adjusted Evidence Score', 'AES uses weighted dimensions and an acceptance threshold tau = 0.70.'],
+      ['Five EQAM dimensions', 'The proposed dimensions are semantic relevance, model confidence, completeness, source reliability, and evidence strength. No EQAM calculation is implemented.'],
+      ['Adjusted Evidence Score', 'AES weighting and the proposed tau = 0.70 threshold require research-methodology approval; no AES calculation is implemented.'],
     ],
   },
   {
     title: 'MCDA',
     icon: SlidersHorizontal,
     items: [
-      ['Framework-constrained AHP', 'Published framework weights are fixed while operational subcriteria use AHP consistency checks with CR <= 0.10.'],
-      ['Fixed-reference TOPSIS', 'Readiness is evaluated against fixed ideal = 1 and anti-ideal = 0 anchors.'],
+      ['Framework-constrained AHP', 'AHP consistency checks and framework-constrained weighting are proposed only; no AHP implementation or verified official-weight source is included.'],
+      ['Fixed-reference TOPSIS', 'Fixed-reference TOPSIS is a proposed method; ideal/anti-ideal anchors and calculation code require approval and implementation.'],
     ],
   },
   {
     title: 'Scoring & Aggregation',
     icon: Target,
     items: [
-      ['RRS', 'Framework-specific Ranking Readiness Scores are computed on a 0-100 scale.'],
-      ['ARRS', 'Aggregated Ranking Readiness Score uses equal framework weighting.'],
-      ['Best-fit rule', 'The maximum RRS is selected unless close alternatives fall within the 5 percentage-point margin rule.'],
+      ['RRS', 'Framework-specific Ranking Readiness Scores are intended outputs; no RRS calculation is implemented.'],
+      ['ARRS', 'Equal framework aggregation is an unapproved proposal; no ARRS calculation is implemented.'],
+      ['Best-fit rule', 'A maximum-score/5-point close-alternative rule is a proposed decision rule; it requires methodology approval and implementation.'],
     ],
   },
   {
     title: 'XAI & Decision Support',
     icon: Lightbulb,
     items: [
-      ['Traceability', 'Scores link back to source passages, page or section metadata, and accepted evidence status.'],
-      ['Gap analysis', 'Criterion readiness and weak evidence dimensions are shown for administrators.'],
-      ['Dashboards and reports', 'Dashboard, ranking, XAI, framework, and validation views support planning decisions.'],
+      ['Traceability', 'The design requires scores to link to source passages and metadata; no persisted provenance chain is implemented.'],
+      ['Gap analysis', 'Criterion readiness and evidence-gap analysis are planned; no analysis engine is implemented.'],
+      ['Dashboards and reports', 'Dashboard, ranking, XAI, framework, and validation reporting are planned views; they are not connected to a working assessment service.'],
     ],
   },
   {
     title: 'Validation, Testing & QA',
     icon: ClipboardCheck,
     items: [
-      ['Baselines and ablation', 'Validation plan includes baseline and component-removal comparisons.'],
-      ['Agreement statistics', "Fleiss' kappa and ICC are included for expert validation."],
-      ['Robustness and ISO quality', 'Sensitivity checks and ISO/IEC 25010 functionality, usability, and security scope are documented.'],
+      ['Baselines and ablation', 'Baseline and ablation comparisons are proposed evaluation activities; no experiments or results are implemented.'],
+      ['Agreement statistics', "Fleiss' kappa and ICC are proposed expert-validation measures; no validation data or computed statistics are present."],
+      ['Robustness and ISO quality', 'Sensitivity and ISO/IEC 25010 evaluation are planned; no test results or quality assessment are implemented.'],
     ],
   },
 ]
