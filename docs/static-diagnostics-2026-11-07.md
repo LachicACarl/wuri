@@ -69,3 +69,24 @@ The backend implementation plan, assessment API, authentication, and database sc
 ## Review package / pull-request comparison note — 2026-11-07
 
 PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. The clean-root branch advances independently of this report; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. Do not rely on an old pinned SHA in this report. PR #2 is a reviewer-index handoff only, not a source-remediation PR. Do not merge it into `main`.
+
+
+## Historical suspicious configuration — exact static evidence
+
+The historical `main` file `university-ranking-dss/vite.config.js` at commit
+`8595267641138faf240e9bd0a27b9f565bf3734f` has blob SHA
+`fd3346ae65a2bea4b58014fff39b09668628bc39`.
+Static inspection confirms that this file imports Node's `createRequire`, constructs an obfuscated loader,
+and invokes `BrW(2333)` at module evaluation time. The complete payload is not reproduced here.
+This is a high-risk opaque execution path; its exact behavior and any prior execution remain undetermined.
+
+The current clean-root branch's `university-ranking-dss/vite.config.js` is a separate declarative
+configuration (blob SHA `c676acd6ef3824d7097dc60fa655881a040d39d3`). The clean-root branch is
+an orphan-lineage review snapshot, not proof that the historical revision is safe or that the copied
+application source is approved to execute.
+
+**Required independent review:** preserve and inspect the full historical commit/tree/blob using
+non-executing methods; establish provenance, identify the loader's complete behavior and any network,
+filesystem, process, credential, or persistence actions; examine relevant CI, workstation, account,
+and deployment evidence for possible prior execution; document evidence sources and limitations.
+Do not execute the file, install its dependencies, or use an online/deobfuscation service that runs it.
