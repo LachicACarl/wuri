@@ -34,7 +34,7 @@ The current branch is a quarantined static HTML/CSS security-hold page plus an u
 - Confirmed `index.html` is a standalone HTML/CSS page with no module script; `src/main.jsx` is absent, and the tracked `src/App.jsx` is not mounted.
 - Confirmed the Vite config contains the standard React and Tailwind plugins, without the previously observed dynamic code-loader pattern in this branch's current Vite config.
 - Confirmed there is no TypeScript source, Python source, backend directory, Supabase client import, upload handler, file input, or score computation in the current app source.
-- Confirmed HTML metadata title, description, and noindex directive are present; no favicon link is present despite a tracked public favicon.
+- Confirmed HTML metadata title, description, and noindex directive are present; the tracked public favicon is not linked from the HTML.
 - Confirmed the dependency lockfile and node_modules are absent.
 - Read the package manifest and noted declared React/Vite/ESLint/Tailwind major versions; compatibility is intentionally unverified because no dependency installation or package-manager resolution was performed.
 - Confirmed the package manifest has dev/build/lint/preview scripts but no test script; the current tree contains no test source files.
