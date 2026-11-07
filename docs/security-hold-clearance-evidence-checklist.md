@@ -6,9 +6,9 @@
 
 ## 1. Repository-side remediation observed
 
-The current recovery branch contains the following changes:
+The current clean-root review snapshot contains the following source-level changes:
 
-- Standard Vite configuration replaces the obfuscated configuration in the current branch tree.
+- The clean-root Vite configuration is declarative and contains React/Tailwind plugins; historical suspicious commits remain preserved outside this orphan lineage for independent review.
 - Root `node_modules/` is absent from the current branch tree; root ignore rules exclude dependencies, build outputs, local environment files, and logs.
 - The clean-root frontend now contains only a static security-hold screen. No upload control, API request, results renderer, scoring constants, frontend authentication state, or Supabase client remains in the current UI.
 - No client-side sign-in is implemented. Authentication is unavailable until an approved server-side service is built and reviewed.
