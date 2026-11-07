@@ -5,7 +5,7 @@ preflight from the backend environment:
 
 ```powershell
 Push-Location backend
-.\venv\Scripts\python.exe -m app.deployment_readiness
+.\\venv\\Scripts\\python.exe -m app.deployment_readiness
 Pop-Location
 ```
 
@@ -14,16 +14,31 @@ is `ready`. Any `blocked` or `manual_verification_required` result keeps real
 institutional intake blocked. The output does not include commands, paths,
 tokens, document names, or institutional data.
 
-## Required configuration
+## Configuration and persistence boundaries
 
-- `WURI_DATABASE_PATH`: production database location.
-- `WURI_STORAGE_PATH`: private document-storage location.
+- `WURI_DATABASE_PATH`: path to the application's **local SQLite database**.
+  It is not a PostgreSQL connection setting and does not configure Supabase.
+  Do not treat a local SQLite file on an ephemeral hosting filesystem as a
+  production database.
+- `WURI_STORAGE_PATH`: path to the application's **local private filesystem
+  storage**. It is not object storage and does not by itself provide durable
+  storage, backups, or recovery.
 - `WURI_SESSION_SECRET`: strong secret managed outside source control.
+- `WURI_ADMIN_USERNAME` and `WURI_ADMIN_PASSWORD`: initial administrator
+  credentials; set privately and never commit real values.
 - `SESSION_COOKIE_SECURE=true` (the default outside local development).
-- `WURI_MALWARE_SCANNER_COMMAND`: trusted server-side scanner wrapper.
-- `WURI_MALWARE_SCANNER_VERIFIED=true`: set only after an administrator has
-  tested the wrapper against the real scanner's documented safe clean and
-  infected test procedure.
+- `WURI_ENVIRONMENT=production` and exact approved
+  `WURI_CORS_ORIGINS` values for a production deployment.
+- `WURI_MALWARE_SCANNER_COMMAND`: administrator-managed scanner executable
+  or wrapper. Its presence is not proof that it is a legitimate or correctly
+  configured malware scanner.
+
+A PostgreSQL/Supabase adapter and private object-storage integration are not
+implemented by these local path settings. They require separately reviewed
+code, schema/migration work, credentials, and recovery design before
+production deployment.
+
+## Malware scanner contract and verification
 
 The scanner command is parsed into an argument list and invoked without a
 shell. The generated private storage path is passed as the final argument;
@@ -38,18 +53,29 @@ The wrapper contract is explicit:
 The application suppresses scanner output because scanner output may contain
 paths or sensitive metadata. The wrapper must be a trusted administrator-owned
 executable, isolated from the web process where possible, and maintained with
-current signatures or detection rules. A configured test command is not
-evidence that production malware scanning is active.
+current signatures or detection rules.
+
+**Important:** `WURI_MALWARE_SCANNER_VERIFIED` is not accepted as evidence and
+must not be used as a readiness bypass. The application rejects a missing,
+malformed, or non-executable configured command. Even when an executable is
+present, readiness remains `manual_verification_required` until an
+administrator independently verifies the actual binary, its provenance,
+version/signature update process, and documented clean/infected test behavior.
+A configured test command or environment boolean cannot prove production
+malware scanning is active.
 
 ## Gate checks
 
 The preflight reports:
 
-- scanner configuration and administrator verification;
+- whether a scanner executable is configured and can be located; independent
+  trust and behavior verification remains manual;
 - private storage writability, with isolation and backup review still manual;
-- Secure cookie configuration;
-- required database migrations;
-- supported formats and upload size;
+- Secure cookie configuration and exact CORS configuration;
+- required SQLite schema migrations;
+- supported formats, per-file upload size, and application request-body limit;
+- external ingress body limit, parser worker resource limits, and container
+  isolation as separate checks;
 - the authorization and research-use workflow;
 - audit retention and operational recovery.
 
@@ -62,28 +88,41 @@ approval, or privacy compliance.
 
 ## Operations and recovery
 
-Production deployment must use HTTPS, private storage permissions, encrypted
-and access-controlled backups, documented deletion and retention periods,
-restore testing, audit-event retention, restricted audit access, upload-size
-and parser resource limits, scanner timeout monitoring, and an incident
-response procedure. A failed scan or interrupted upload must not create an
-approved evidence record; a document referenced by an approved research
-dataset cannot be deleted or have its verification metadata downgraded.
+Production deployment must use HTTPS, private durable storage permissions,
+encrypted and access-controlled backups, documented deletion and retention
+periods, restore testing, audit-event retention, restricted audit access,
+upload-size and parser resource limits, scanner timeout monitoring, and an
+incident response procedure. A failed scan or interrupted upload must not
+create an approved evidence record; a document referenced by an approved
+research dataset cannot be deleted or have its verification metadata
+downgraded.
+
+The current local SQLite and filesystem storage implementation is not, by
+itself, a production persistence architecture. Do not enable institutional
+document intake on an ephemeral filesystem or treat a successful local
+preflight as proof of durable storage, PostgreSQL availability, or backup
+recoverability.
 
 ## Final enablement checklist
 
 Before enabling real institutional evidence intake, an administrator must
 confirm:
 
-1. The preflight exits successfully in the deployment environment.
-2. The real scanner wrapper passes its documented clean and infected tests.
-3. HTTPS, Secure cookies, private storage, backup, restore, retention, and
-   audit controls are operational.
-4. Participating institutions have supplied authorization and research-use
+1. The preflight exits successfully in the actual deployment environment.
+2. The real scanner binary/wrapper passes its documented clean and infected
+   tests and its update process is operational.
+3. HTTPS, Secure cookies, exact CORS origins, private durable storage, backup,
+   restore, retention, and audit controls are operational.
+4. The database and storage architecture is durable, access-controlled, and
+   independently recoverable; local SQLite/filesystem settings are not
+   mistaken for PostgreSQL/object storage.
+5. External ingress limits and container isolation are independently
+   verified in addition to application-level controls.
+6. Participating institutions have supplied authorization and research-use
    permission through the approved human process.
-5. DUA, ethics, privacy, and source-rights responsibilities have been reviewed
+7. DUA, ethics, privacy, and source-rights responsibilities have been reviewed
    by the responsible authorities.
-6. The A0 protocol remains researcher-approved before any research experiment.
+8. The A0 protocol remains researcher-approved before any research experiment.
 
 The current development environment has no configured production scanner, so
 the real-evidence gate remains blocked. Mocked scanner tests demonstrate
