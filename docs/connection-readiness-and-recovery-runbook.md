@@ -100,7 +100,7 @@ Only after explicit runtime/database authorization, verify in this order:
 
 | Component | Status |
 |---|---|
-| WURI Supabase project visible to connected account | VERIFIED |
+| WURI Supabase project identity and current provider status | NOT RE-VERIFIED — historical listing is insufficient evidence |
 | Supabase application credentials/rotation | UNVERIFIED |
 | Database schema and migrations | NOT INSPECTED / NOT IMPLEMENTED |
 | RLS and storage policy | NOT INSPECTED / NOT VERIFIED |
