@@ -5,8 +5,9 @@
 
 ## Current application source
 
-- `university-ranking-dss/src/main.jsx` — React DOM entry, browser router, and CSS import.
-- `university-ranking-dss/src/App.jsx` — non-operational security-hold screen.
+- `university-ranking-dss/index.html` — standalone static HTML/CSS security-hold page; contains no module script or React mount.
+- `university-ranking-dss/src/main.jsx` — **absent from the tracked tree**; no React DOM entrypoint exists.
+- `university-ranking-dss/src/App.jsx` — hold-screen React component, currently unmounted and not loaded by `index.html`.
 - `university-ranking-dss/src/index.css` — global CSS and Tailwind import.
 - `university-ranking-dss/vite.config.js` — declarative React/Tailwind Vite plugins.
 - `university-ranking-dss/eslint.config.js` — lint configuration.
@@ -14,7 +15,7 @@
 
 ## Current status
 
-This branch contains a quarantined JavaScript/React frontend only. There is no server/API, authentication, upload, database adapter, Supabase client, private storage, extraction pipeline, ranking engine, or persistent history.
+This branch actively serves a standalone static HTML/CSS hold page. A React component and Vite configuration are also tracked, but the React component is not mounted: `src/main.jsx` is absent and `index.html` contains no module script. Do not describe the current page as a functioning React frontend. There is no server/API, authentication, upload, database adapter, Supabase client, private storage, extraction pipeline, ranking engine, or persistent history.
 
 ## Reports and proposals
 
