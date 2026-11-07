@@ -68,13 +68,26 @@ A future approved frontend/backend integration may adopt a structured assessment
 
 The numeric zeroes above are schema placeholders, not sample institutional scores, defaults, or acceptable fallback output. A backend must never return placeholder values as an assessment.
 
+## Contract gaps to resolve before implementation
+
+The example above is intentionally illustrative and is not yet a complete production response schema. Before implementation, the API owner and research reviewer must decide and version at least:
+
+- Stable `request_id` and `assessment_id` fields and their lifecycle/idempotency behavior.
+- Explicit `status` and timestamps, including whether an accepted upload returns `202 Accepted` with a processing resource or waits for completion.
+- `methodology_version`, `model_version`, `extractor_version`, and contract/schema version in the response envelope.
+- A stable provenance reference for every evidence item, including source-document identifier and content hash; do not expose private storage object keys.
+- A typed, machine-readable error envelope with a correlation/request identifier and documented retryability.
+- Whether framework-specific scores may be absent independently, or whether the entire assessment must fail closed when any required framework is incomplete.
+
+The numeric placeholders in the example must not be interpreted as required defaults. Replace them with an approved typed schema before implementation; never serialize fabricated zero scores as completed results.
+
 ## Required semantics
 
 1. All scores must be produced by the approved and validated assessment pipeline. The API must not synthesize values from filenames, file sizes, timestamps, hardcoded passages, or deterministic placeholder functions.
 2. Evidence passages must originate from the uploaded document. Each item must retain accurate page/section and source provenance.
 3. EQAM dimensions and AES must follow the approved methodology version. Do not invent confidence or source-reliability values.
 4. Framework scores and ARRS must follow approved criteria, weights, anchors, and data partitions. The API must identify the methodology/model version in the eventual production contract.
-5. If extraction, provenance, mapping, or scoring is incomplete, return an explicit non-success error and no score object.
+5. If extraction, provenance, mapping, or scoring is incomplete, return an explicit non-success response and no completed score object. If the approved workflow is asynchronous, return only a processing resource with no scores until the assessment reaches a valid completed state.
 6. Client-side validation is a display safeguard only. The server is authoritative and must validate data, permissions, research gate, and provenance.
 
 ## Error behavior
