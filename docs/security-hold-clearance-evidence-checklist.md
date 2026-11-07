@@ -14,7 +14,7 @@ The current clean-root review snapshot contains the following source-level chang
 - No client-side sign-in is implemented. Authentication is unavailable until an approved server-side service is built and reviewed.
 - Root README documents the project structure, hold, and restrictions.
 
-These changes do **not** establish that historical commits or dependency artifacts were safe, that the suspicious code was never executed, or that any credential was revoked.
+These changes do **not** establish that historical commits or dependency artifacts were safe, that the suspicious code was never executed, or that any credential was revoked. Older project-listing notes are not live provider-state evidence and must be re-confirmed directly by the authorized owner.
 
 ## 2. Mandatory external security evidence
 
@@ -23,7 +23,7 @@ These changes do **not** establish that historical commits or dependency artifac
 | SEC-01 | Forced update authorization and provenance | Dated maintainer statement identifying actor, authorization, source revision, and reason for the forced update | OPEN |
 | SEC-02 | Suspicious Vite configuration review | Independent reviewer report identifying exact commit/tree/blob, complete behavior, and any follow-on behavior | OPEN |
 | SEC-03 | Possible prior execution assessment | Reviewer/incident handler statement describing host, account, CI, workstation, and deployment evidence examined, plus limitations | OPEN |
-| SEC-04 | Exposed Supabase service-role key | Authorized Supabase owner confirmation that the exposed key is revoked/disabled and cannot be used | OPEN |
+| SEC-04 | Exposed Supabase service-role key | Authorized Supabase owner confirmation that the exposed key is revoked/disabled and cannot be used; verify against the correct WURI project, not another project with a similar label | OPEN |
 | SEC-05 | Replacement credential custody | Confirmation that any replacement is newly generated, stored only in an approved server-side secret store, and not shared in source/chat | OPEN |
 | SEC-06 | Dependent service update | Inventory of authorized services using the replacement secret, with confirmation each has been updated or disabled | OPEN |
 | SEC-07 | Provider log review | Dated owner/security review of available authentication, API, database, and project activity logs; note retention/visibility limits | OPEN |
