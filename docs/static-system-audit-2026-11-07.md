@@ -1,231 +1,99 @@
 # WURI DSS Static System Audit — 2026-11-07
 
-**Target:** `security/recovery-remove-obfuscated-vite-config`  
+**Target:** `security/clean-root-quarantine-2026-11-07`  
+**Historical context:** `security/recovery-remove-obfuscated-vite-config`  
 **Audit type:** GitHub source/tree inspection only  
 **Status:** HOLD — NO-GO; not a runtime test, penetration test, build, lint, or database audit  
-**Current branch head at audit start:** `7b69fe7233074659ec7b0439f88920ecf7f5574d`
+**Current state:** security-hold frontend snapshot only
 
 ## Executive finding
 
-The repository is currently a frontend-only React/Vite prototype. The inspected tree contains no backend/server/API source, no implemented assessment engine, no database migrations/schema, no Supabase client integration, and no test files. The frontend makes a request to `POST /api/upload`, but no handler exists in this repository tree. The login is deliberately fail-closed; as written, all protected workspace routes are inaccessible. Therefore the system is not operational or connected end-to-end.
-
-This is a static code finding, not proof that no external service exists elsewhere. No runtime behavior was tested.
-
-## Severity-ranked findings
-
-### CRITICAL — F-01: No backend handler for upload API
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `DocumentUpload` component; call to `fetch('/api/upload', ...)`.
-- **Evidence:** frontend posts multipart fields `file` and `document_type`; recursive repository tree contains no backend/API/server directory or handler.
-- **Impact:** upload cannot produce a system assessment through this repository. Depending on hosting, the request will fail or be handled by a generic frontend fallback.
-- **Required fix after authorization:** create an explicitly approved backend service, implement authenticated upload, private object storage, extraction, evidence provenance, approved scoring, and typed API responses. Add contract tests and safe error mapping.
-- **Current status:** NOT IMPLEMENTED.
-
-### CRITICAL — F-02: Authentication permanently blocks all protected routes
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `App()`.
-- **Evidence:** `isAuthenticated` initializes as `false`; no session check/provider is present; no code path sets it to `true`. The wildcard route redirects every non-login URL to `/login`. Login component explicitly says authentication service is not configured.
-- **Impact:** dashboard, upload, evidence, analysis, XAI, history, architecture, checklist, and validation pages cannot be accessed through normal routing.
-- **Required fix after authorization:** integrate reviewed server-side identity/session flow; initialize frontend state from a session endpoint; protect backend routes independently; enforce roles, membership, institution scope, CSRF, and expiry. Do not set a client boolean as authentication.
-- **Current status:** intentionally locked; replacement not implemented.
-
-### HIGH — F-03: Frontend claims more research-method implementation than exists
-
-- **Location:** `university-ranking-dss/src/App.jsx`; `FRAMEWORKS`, `EQAM_DIMENSIONS`, `FrameworkAnalysis`, `EvidenceView`, `ValidationView`.
-- **Evidence:** constants define framework/indicator weights; UI describes EQAM/AES threshold, AHP consistency, fixed-reference TOPSIS, RRS/ARRS, validation metrics. No scoring/model implementation or research calculation modules exist in the tree. The only score data path is the external API response.
-- **Impact:** displayed weights/method language can be mistaken for a validated implementation or official methodology. This is especially risky for dissertation/research reporting.
-- **Required fix:** reconcile every constant, indicator label, weight, threshold, formula, anchor, and decision rule with the approved methodology/data dictionary and authoritative framework editions. Version the methodology and cite source documents in the UI/report. Implement only after researcher approval and independent validation.
-- **Current status:** display-only constants; methodology not independently verified in this audit.
-
-### HIGH — F-04: Frontend response validator does not establish authenticity or methodological correctness
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `isUsableBackendEvaluation`.
-- **Evidence:** checks data shape, score ranges, required strings, evidence fields, split labels, AES and EQAM value ranges. It does not verify a trusted signature, request/assessment ID, methodology/model version, calculation provenance, evidence hash linkage, completeness thresholds, or that the server used the uploaded file.
-- **Impact:** any server response with matching shape could be rendered as a “validated backend assessment”, even if the content is fabricated or methodologically invalid.
-- **Required fix:** make server authoritative; include request ID, assessment ID, document hash, extraction run, methodology/model versions, evidence/source IDs, and server-side validation state. Frontend validator is UX defense only. Add schema and provenance contract tests.
-- **Current status:** shape validation only; not cryptographic or methodological verification.
-
-### HIGH — F-05: Framework configuration is hardcoded in frontend
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `FRAMEWORKS` and `EQAM_DIMENSIONS`.
-- **Evidence:** fixed weights and indicator lists are embedded in the component source.
-- **Impact:** no effective configuration versioning, audit trail, administrator governance, or safe updating when official frameworks/methodology change.
-- **Required fix:** after approving source/methodology, move configuration into versioned server-managed records or reviewed immutable configuration package; attach source edition, effective date, version, and approval metadata. Never let arbitrary client values change research results.
-- **Current status:** hardcoded display data.
-
-### HIGH — F-06: "Official" and "fixed" weighting terminology is unsupported by code evidence
-
-- **Location:** `FRAMEWORKS[*].officialWeight`, `FrameworkAnalysis` labels "fixed".
-- **Evidence:** every framework is assigned 0.25; indicator weights are embedded as numeric literals. No source citation or configuration provenance accompanies them in the UI.
-- **Impact:** a user may interpret these as official ranking-body weightings or approved cross-framework aggregation.
-- **Required fix:** verify each item against the exact official framework methodology and dissertation method. Label them "proposed research configuration" until evidence/approval exists. Do not use 25% equal weighting unless the research protocol explicitly approves it.
-- **Current status:** unverified in this static audit.
-
-### HIGH — F-07: History is volatile session memory, not persistent or auditable history
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `App()` and `HistoryView`.
-- **Evidence:** `history` starts as `[]` and updates via `useState`; there is no persistence/API retrieval. The UI copy does say "session-only" and "not an official university ranking".
-- **Impact:** refresh/navigation lifecycle or new browser session loses history; no audit/reproducibility record.
-- **Required fix:** retain session-only label or implement a protected server-side assessment history endpoint with tenant authorization, immutable run identifiers, methodology versions, and audit events. Do not call it ranking history unless true ranking data exists.
-- **Current status:** session-only, explicitly not persistent.
-
-### MEDIUM — F-08: Nested route layout and wildcard routing deserve correction/verification
-
-- **Location:** `university-ranking-dss/src/App.jsx`, `App()`.
-- **Evidence:** a top-level `/login` route and wildcard `/*` route; the wildcard element conditionally renders a shell containing a second `<Routes>` tree with absolute paths.
-- **Impact:** route matching is harder to reason about; direct deep links, 404 handling, and route protection are not explicit. Authentication lock currently masks most behavior.
-- **Required fix:** after session design is approved, use a single route tree with a protected layout route and explicit index/child routes plus a not-found route. Add tests for direct navigation, refresh, unknown paths, unauthenticated redirects, and role denial.
-- **Current status:** static review only; no router behavior test run.
-
-### MEDIUM — F-09: Upload control lacks visible client-side size and robust interaction/error handling
-
-- **Location:** `DocumentUpload`.
-- **Evidence:** file input accepts extensions PDF/DOCX/TXT but no client max-size check; clickable drop-zone is a generic `div`; no disabled/busy state prevents repeated submission; input is reset in finally.
-- **Impact:** poor accessibility/UX and avoidable requests. Client controls cannot replace server validation.
-- **Required fix:** use a keyboard-accessible label/button/dropzone, explicit busy state, visible file size/type constraints, cancellation and retry states, request ID/error code display. Validate all limits/signatures server-side.
-- **Current status:** static UI shortcomings; server enforcement absent.
-
-### MEDIUM — F-10: UI result validator and renderers can disagree on data contract
-
-- **Location:** `isUsableBackendEvaluation`, `Dashboard`, `EvidenceView`, `FrameworkAnalysis`, `ExplainableAI`, `HistoryView`.
-- **Evidence:** validator accepts fields such as `metadata`, `scores`, `evidence`, `strengths`, `weaknesses`; some views also optionally read `sub_scores`, while history derives timestamp client-side. Proposed API contract is not versioned and has no explicit `schema_version`, `request_id`, or server-produced run timestamp.
-- **Impact:** backend/frontend drift and ambiguous provenance/history.
-- **Required fix:** create a versioned shared schema and generated/contract-tested types; explicit response schema version, run timestamps, ids, and methodology provenance. Reject unsupported versions.
-- **Current status:** no backend to validate against.
-
-### MEDIUM — F-11: Error feedback is only a raw status string
-
-- **Location:** `DocumentUpload`.
-- **Evidence:** catch block concatenates an exception message into a status sentence; no structured error codes, request ID, retryability, or sanitized mapping.
-- **Impact:** fragile UX; once backend exists, raw server error text could disclose internal details if returned carelessly.
-- **Required fix:** map safe client-facing error codes; log details only server-side with correlation IDs and secret redaction.
-
-### MEDIUM — F-12: Dependency provenance and compatibility remain unverified
-
-- **Location:** `university-ranking-dss/package.json`, `package-lock.json`.
-- **Evidence:** manifest declares React 18, React Router 7, Vite 6+ plugin, Tailwind 4, ESLint 10 and supporting plugins using ranges. No install/audit/compatibility/build/lint was run under the security hold.
-- **Impact:** dependency compatibility, advisories, postinstall behavior, lockfile integrity, and build reproducibility remain unknown.
-- **Required fix:** after dependency-security clearance and explicit runtime authorization, perform a lockfile/provenance review, use a pinned supported Node LTS, clean install, audit, lint, build, and tests in an isolated disposable environment. Do not run unreviewed lifecycle scripts before clearance.
-- **Current status:** NOT VERIFIED; no claim of a vulnerability is made.
-
-### LOW — F-13: Browser document metadata and session state are not persisted
-
-- **Location:** `App()`, `DocumentUpload`.
-- **Evidence:** evaluation and history are React state only. No Supabase SDK, API base URL configuration, auth SDK, or persistence adapter appears in the frontend source.
-- **Impact:** data disappears on reload; no resumable processing or cross-device session.
-- **Required fix:** implement only through approved server contracts; avoid direct privileged database access from the browser.
-
-### LOW — F-14: Default app metadata is generic starter content
-
-- **Location:** `university-ranking-dss/index.html`, `src/assets`.
-- **Evidence:** title remains `university-ranking-dss`; assets include Vite/React starter SVGs.
-- **Impact:** unfinished product identity/metadata, not a functional blocker.
-- **Required fix:** set an approved product title/description/icon and remove unused starter assets after UI owner approval.
-
-## Structural inventory
-
-Inspected recursive tree under `university-ranking-dss/`:
-
-- `package.json`, `package-lock.json`, Vite config, ESLint config, HTML entry point.
-- `src/main.jsx`, `src/App.jsx`, `src/App.css`, `src/index.css`.
-- Static assets including `hero.png`, React/Vite SVGs, favicon/icons.
-- No backend/API/server directory.
-- No test directory or test files.
-- No migrations/SQL schema in the frontend app tree.
-- No Supabase client package or import identified in inspected frontend source.
-- No environment variable references or configured API base URL identified; upload path is relative `/api/upload`.
-
-## Suggested resolution order after clearance
-
-1. **Security gate:** independent review of suspicious history, credential containment evidence, dependency provenance, exact commit approval.
-2. **Runtime gate:** separately authorize isolated dependency review/install, lint/build/tests; keep production and real data out of scope.
-3. **BE-01:** approved identity/session flow and server-side tenant/role authorization.
-4. **BE-02:** private upload/storage and validation.
-5. **BE-03:** extraction with page/section/source hash provenance.
-6. **BE-04:** researcher-approved, versioned methodology and scoring engine.
-7. **BE-05:** versioned API contract, request/assessment retrieval, UI integration.
-8. **BE-06:** reviewed schema, RLS/least-privilege, audit, backup and recovery.
-9. End-to-end tests with synthetic fixtures; independent security and research review; only then separate production authorization.
-
-## Not performed
-
-- No package installation, scripts, lint, build, tests, server startup, or code execution.
-- No GitHub Actions run/trigger/re-run.
-- No Supabase database/table/schema/storage/log/credential access or change.
-- No key rotation or revocation.
-- No migrations or deployment.
-- No real institutional/research data processing.
-- No change to `main`.
-
-**This report records static findings only. It does not clear the security hold or authorize code/runtime changes.**
-
-
-## Follow-up UI integrity correction — 2026-11-07
-
-A follow-up static review found that several descriptive panels could imply implementation where only plans or constants exist. The isolated clean-root branch was updated to:
-
-- Label the framework/indicator values as **proposed and unverified**, not official/fixed.
-- State explicitly that AHP, TOPSIS, EQAM, AES, RRS and ARRS are not implemented in the frontend.
-- Rewrite checklist descriptions to distinguish proposed capability from working functionality.
-- Change the checklist page heading to “Proposed Requirements Checklist” and replace green completion marks with amber planned-status indicators.
-- Label architecture as proposed, role model as not enforced, and report artifacts as planned.
-- Label validation material as a proposed plan, state that no evaluation has been executed, and change status labels from “Defined” to “Planned”.
-- Preserve the locked-workspace screen and avoid introducing fake login, sample scores, or backend stubs.
-
-These are source/documentation changes only. They have not been linted, built, executed, or tested because runtime authorization remains absent.
-
-
-## Upload and inactive-prototype quarantine — 2026-11-07
-
-A further source review found that the old upload form still attempted `POST /api/upload` even though no backend existed, and dormant dashboard/evidence/XAI/history components still contained code to render API-shaped scores and records. The clean-root branch was updated to:
-
-- Remove the upload form, FormData creation, and `POST /api/upload` request entirely.
-- Display supported document classes only as planned scope; explicitly warn not to submit institutional files or credentials.
-- Replace dashboard, evidence, XAI, and history result views with a clear unavailable/security-hold landing state.
-- Remove inactive route components, frontend authentication boolean, result-shape validator, history state, hardcoded framework/indicator weights, EQAM constants, Recharts imports and unused UI imports.
-- Keep a small React Router entry that displays the security-hold landing page for all paths.
-- Preserve the prior explicit statements that backend, authentication, database integration, extraction, scoring, and research validation are not implemented.
-
-This reduces attack surface and avoids accidental upload attempts, but it is not the requested functioning application. It is a quarantined UI state pending independent security review, credential containment, and written runtime authorization. No source execution, dependency installation, lint, build, tests, Actions, Supabase access, database changes, or deployment occurred.
-
-
-## Current clean-root UI state correction — 2026-11-07
-
-The current `university-ranking-dss/src/App.jsx` is a 47-line security-hold landing page. The UI is intentionally non-operational and no longer contains the previous dormant upload/results prototype. Static inspection confirms:
-
-- No `/api/upload`, `FormData`, or file input.
-- No frontend Supabase client or database integration.
-- No framework weights, EQAM constants, score validator, dashboard chart, evidence result renderer, XAI result renderer, or session-history component.
-- No real authentication or role authorization.
-- All routes render the security-hold notice. Users are warned not to submit institutional documents or credentials.
-- The previous checklist, architecture, and validation panels are no longer part of the application UI; their descriptions remain in this audit/documentation as proposed design only.
-
-The remaining repository files (including package manifest and configuration) have not been installed, executed, linted, built, or tested. This remains a quarantined static snapshot, not an operational WURI system.
-
-
-## Language and frontend stack inventory — 2026-11-07
-
-Static inspection of the clean-root tree identifies the implemented frontend technologies:
-
-- **JavaScript (ES modules):** application and configuration language; the package manifest declares `"type": "module"`.
-- **JSX:** React component syntax in `src/App.jsx` and `src/main.jsx`.
-- **React 18 / React DOM:** frontend component and rendering libraries.
-- **Vite:** frontend development/build tool, configured in `vite.config.js`.
-- **CSS and Tailwind CSS 4:** styling; `src/index.css` imports Tailwind.
-- **React Router 7:** browser routing via `BrowserRouter`, `Routes`, and `Route`.
-- **Lucide React:** icon library; the active hold screen uses `ShieldCheck`.
-- **ESLint:** static-analysis configuration.
-
-No backend source tree, Python/FastAPI application, Node.js API server, Supabase client, SQL migrations, or server-side scoring implementation appears in this quarantined tree. A dependency name alone does not prove a capability is implemented. This is a static repository inventory, not a dependency/runtime validation.
-
-
-## Starter asset and entrypoint cleanup — 2026-11-07
-
-The isolated UI entrypoint was checked for residual Vite template content. The template-only comment in `src/main.jsx` was removed. The tracked tree contains unused starter assets: `src/assets/react.svg`, `src/assets/vite.svg`, and `public/icons.svg`; these were removed from the quarantined frontend because the active hold page does not reference them. The generic `public/favicon.svg` was retained because `index.html` references it. The binary `src/assets/hero.png` was not modified through the text-only GitHub file interface.
-
-Documentation was clarified to state that proposed API/auth/database documents are design artifacts only and that the frontend has no working backend, authentication, upload, scoring, or Supabase operations. Static tree/source review only; no scripts, dependency install, lint, build, test, or runtime execution.
-
-
-## Full static diagnostics snapshot — 2026-11-07
-
-See `docs/static-diagnostics-2026-11-07.md` for severity-ranked source findings, checks performed, checks not performed, and explicit next steps. This report distinguishes confirmed absences from blocked runtime checks; no unrun check is labeled passed.
+The inspected clean-root branch contains a minimal React/Vite frontend that renders a security-hold notice on every route. It contains no backend, API handler, authentication service, Supabase client, database migrations, document upload, extraction pipeline, assessment algorithms, or automated tests. It is intentionally non-operational.
+
+The earlier audit findings below describe the pre-quarantine prototype and must not be read as current source findings. The historical main commit and suspicious configuration require independent investigation; the clean-root snapshot is a separate orphan-lineage review candidate, not security-cleared code.
+
+## Current source inventory
+
+| Area | Current finding |
+|---|---|
+| App entry | React 18 / JSX, React Router |
+| Build/tooling config | Vite with React and Tailwind plugins |
+| Styles | Tailwind CSS import and global CSS |
+| Frontend authentication | Not implemented |
+| Upload/file handling | Not present |
+| API/backend | Not present |
+| Supabase/database | Not present |
+| Extraction/evidence provenance | Not present |
+| Scoring and reporting | Not present |
+| Tests | No test source files in current tree |
+| Dependency lockfile | Absent; reproducibility not established |
+| Installed dependencies | Absent from tracked tree; no install permitted |
+| Runtime/build/lint | Not executed |
+
+## Historical findings — pre-quarantine prototype only
+
+The following sections from the initial audit described the earlier frontend prototype, before the clean-root quarantine. They are retained for historical remediation context, not as claims about the current `App.jsx`:
+
+- F-01: the old document upload component posted to `/api/upload` without a backend handler.
+- F-02: the old protected routes used an authentication flag that could never become true.
+- F-03 onward: framework score display, response validation, session-only history, error feedback, and other dormant views were found in the pre-quarantine code.
+
+Those components and associated upload/result logic were subsequently removed from the current clean-root snapshot. Do not use old line references or component names as current source evidence without re-verification.
+
+## Current static security observations
+
+1. Current `src/App.jsx` renders only the hold notice.
+2. Current `src/main.jsx` mounts React, React Router, and `src/index.css`.
+3. Current `vite.config.js` contains declarative React and Tailwind plugins; no previously identified dynamic code-loader pattern is present in this branch's current file.
+4. Current source has no upload endpoint call, file input, FormData, authentication state, Supabase client, score result model, or assessment calculation.
+5. `index.html` includes the WURI security-hold title, description, and noindex directive.
+6. The package manifest declares React/Vite/Tailwind/Router/icon dependencies, but without a lockfile these are not reproducibly resolved or verified.
+7. `src/assets/hero.png` remains in the tree but is not referenced by the current hold-page source; no decision to permanently remove the binary asset is implied.
+8. Proposed API, authentication, and database documents are planning artifacts only.
+
+## Severity and disposition
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| BLOCKER | No operational backend/API | Confirmed absent; implementation not authorized |
+| BLOCKER | No authentication/authorization | Confirmed absent |
+| BLOCKER | No safe document intake/storage/extraction | Confirmed absent |
+| BLOCKER | No approved ranking assessment engine | Confirmed absent; requires methodology approval |
+| BLOCKER | No database integration or migrations | Confirmed absent |
+| HIGH | Dependency lockfile absent | Not reproducible; review/generation requires approval |
+| HIGH | Runtime correctness unknown | Build/lint/tests not run |
+| HIGH | Independent security review pending | External evidence required |
+| HIGH | Exposed key revocation/replacement unconfirmed | Authorized Supabase-owner evidence required |
+| MEDIUM | Unused hero asset remains | Static observation; cleanup decision pending |
+
+## Checks performed
+
+- Inspected the current recursive tree and application/config/documentation source.
+- Checked app entry imports, HTML entrypoint references, favicon reference, Vite plugin configuration, package scripts, and package dependency declarations.
+- Checked current UI for upload, auth, Supabase, score/result, and dormant prototype constructs.
+- Checked documentation against current source and corrected stale historical language.
+- Confirmed current branch remains separate from `main`.
+
+## Checks not performed
+
+These checks are **not passed**; they were not run:
+
+- JavaScript/JSX parser or compiler.
+- Package installation, dependency resolution, advisory audit, integrity audit, or lockfile generation.
+- ESLint or Vite build/preview.
+- Browser startup, accessibility, responsive, or manual UI checks.
+- Unit, integration, API, E2E, or security tests.
+- GitHub Actions execution.
+- Supabase Auth, schema, tables, RLS, storage, logs, credentials, or data inspection.
+- Key revocation/rotation, migrations, real-data handling, or deployment.
+
+## Required next steps
+
+1. Independent review of suspicious historical commit, forced-update provenance, and possible prior execution.
+2. Authorized Supabase-owner confirmation that the exposed service-role credential was revoked and replacement custody is secure.
+3. Written approval specifying exact clean-root branch/commit, isolated environment, allowed dependency/runtime commands, synthetic-data boundary, and stop conditions.
+4. After authorization, review dependency provenance, create the lockfile, then run lint/build/tests and remediate actual errors.
+5. Obtain separate research-method approval before implementing the extraction and assessment pipeline.
+6. Obtain separate database and deployment authorizations before any Supabase changes or production activity.
+
+**Conclusion:** This audit records source-level facts only. It does not certify the app as buildable, secure, or operational. The current frontend remains deliberately locked.
