@@ -15,71 +15,42 @@
 
 The server must enforce authentication, authorization, file-size limits, content-type/signature checks, malware scanning where approved, storage policy, and audit logging. Do not trust client-supplied filenames, MIME types, institution names, metadata, or scores.
 
-## Success response
+## Illustrative asynchronous acceptance response (proposed)
 
-A future approved frontend/backend integration may adopt a structured assessment response with fields such as these:
+The preferred draft lifecycle is asynchronous because extraction and assessment may take longer than a normal request. This is an example only; the exact status code, resource path, and fields require owner approval before implementation. An accepted request has **not** completed an assessment and must not contain scores or evidence claims:
 
 ```json
 {
-  "filename": "source-document.pdf",
-  "school_name": "Institution name established from verified source metadata",
-  "best_fit": "Framework result supported by approved scoring output",
-  "arrs": 0,
-  "scores": {
-    "WURI": 0,
-    "THE": 0,
-    "QS": 0,
-    "UI GreenMetric": 0
-  },
-  "strengths": ["Evidence-supported strength"],
-  "weaknesses": ["Evidence-supported gap"],
-  "evidence": [
-    {
-      "id": "EVIDENCE-ID",
-      "passage": "Verbatim extracted passage from the source document",
-      "framework": "WURI",
-      "indicator": "Mapped indicator",
-      "source": "source-document.pdf",
-      "date": "YYYY-MM-DD",
-      "page": 1,
-      "section": "Source section heading",
-      "split": "validation",
-      "aes": 0,
-      "accepted": false,
-      "dimensions": {
-        "Semantic Relevance": 0,
-        "Model Confidence": 0,
-        "Evidence Completeness": 0,
-        "Source Reliability": 0,
-        "Evidence Strength": 0
-      }
-    }
-  ],
-  "metadata": {
-    "source": "source-document.pdf",
-    "sourceType": "Strategic plan",
-    "date": "YYYY-MM-DD",
-    "extractionStatus": "Actual extraction state",
-    "verificationStatus": "Actual verification state",
-    "provenance": "Stable source record or provenance reference"
-  }
+  "request_id": "opaque-request-id",
+  "assessment_id": "opaque-assessment-id",
+  "status": "queued",
+  "status_url": "/api/assessments/opaque-assessment-id",
+  "created_at": "RFC-3339 timestamp",
+  "contract_version": "approved-contract-version"
 }
 ```
 
-The numeric zeroes above are schema placeholders, not sample institutional scores, defaults, or acceptable fallback output. A backend must never return placeholder values as an assessment.
+The acceptance example intentionally contains no scores, evidence passages, or institution claims. A completed-result schema, if approved, must be specified separately and may only be returned after a valid assessment reaches its approved terminal success state.
 
 ## Contract gaps to resolve before implementation
 
 The example above is intentionally illustrative and is not yet a complete production response schema. Before implementation, the API owner and research reviewer must decide and version at least:
 
-- Stable `request_id` and `assessment_id` fields and their lifecycle/idempotency behavior.
-- Explicit `status` and timestamps, including whether an accepted upload returns `202 Accepted` with a processing resource or waits for completion.
+- Stable `request_id` and `assessment_id` fields, their lifecycle, and an idempotency-key policy. Define whether IDs are created before or after durable queue acceptance.
+- Explicit processing statuses and timestamps. The current proposal prefers `202 Accepted` with a processing resource, but the final state names, polling/notification mechanism, retention, and timeout behavior remain approval decisions.
 - `methodology_version`, `model_version`, `extractor_version`, and contract/schema version in the response envelope.
-- A stable provenance reference for every evidence item, including source-document identifier and content hash; do not expose private storage object keys.
+- A stable provenance reference for every evidence item, including source-document identifier and content hash; do not expose private storage object keys. Distinguish a public opaque evidence ID from a private storage object key.
 - A typed, machine-readable error envelope with a correlation/request identifier and documented retryability.
 - Whether framework-specific scores may be absent independently, or whether the entire assessment must fail closed when any required framework is incomplete.
+- A separate completed-result schema, including score units/ranges, missing-value representation, explanation references, and partial-framework policy.
 
 The numeric placeholders in the example must not be interpreted as required defaults. Replace them with an approved typed schema before implementation; never serialize fabricated zero scores as completed results.
+
+## Proposed lifecycle (to be finalized)
+
+The draft asynchronous flow is: validate and authorize the request; durably accept it with an opaque request/assessment ID; return a processing resource without scores; transition through approved processing states; publish a completed result only after all required evidence/provenance/methodology checks pass; otherwise move to a terminal failure state with a safe error code. Polling, callbacks, cancellation, retry, and state naming remain unresolved until the API and operations owners approve them.
+
+HTTP behavior must be finalized with the API owner. A possible pattern is `202 Accepted` for durable queue acceptance, `200 OK` for retrieval of an existing processing/completed resource, `401/403` for identity/access failures, `409 Conflict` for idempotency-key reuse with a different request fingerprint, `413` for oversized input, `415` for unsupported media, `422` for semantically invalid content, and safe `5xx` errors for service failures. These are proposals, not implemented behavior or final commitments.
 
 ## Required semantics
 
