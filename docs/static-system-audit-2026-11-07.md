@@ -201,3 +201,19 @@ The current `university-ranking-dss/src/App.jsx` is a 47-line security-hold land
 - The previous checklist, architecture, and validation panels are no longer part of the application UI; their descriptions remain in this audit/documentation as proposed design only.
 
 The remaining repository files (including package manifest and configuration) have not been installed, executed, linted, built, or tested. This remains a quarantined static snapshot, not an operational WURI system.
+
+
+## Language and frontend stack inventory — 2026-11-07
+
+Static inspection of the clean-root tree identifies the implemented frontend technologies:
+
+- **JavaScript (ES modules):** application and configuration language; the package manifest declares `"type": "module"`.
+- **JSX:** React component syntax in `src/App.jsx` and `src/main.jsx`.
+- **React 18 / React DOM:** frontend component and rendering libraries.
+- **Vite:** frontend development/build tool, configured in `vite.config.js`.
+- **CSS and Tailwind CSS 4:** styling; `src/index.css` imports Tailwind.
+- **React Router 7:** browser routing via `BrowserRouter`, `Routes`, and `Route`.
+- **Lucide React:** icon library; the active hold screen uses `ShieldCheck`.
+- **ESLint:** static-analysis configuration.
+
+No backend source tree, Python/FastAPI application, Node.js API server, Supabase client, SQL migrations, or server-side scoring implementation appears in this quarantined tree. A dependency name alone does not prove a capability is implemented. This is a static repository inventory, not a dependency/runtime validation.
