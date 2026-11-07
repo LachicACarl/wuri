@@ -38,8 +38,6 @@ jobs:
 
   frontend-validation:
     name: Frontend lint and build
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -71,10 +69,35 @@ jobs:
             university-ranking-dss/package-lock.json
             university-ranking-dss/npm-audit.json
           retention-days: 1
-      - name: Commit patched lockfile to the PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Run ESLint
+        working-directory: university-ranking-dss
+        run: npm run lint
+      - name: Build frontend
+        working-directory: university-ranking-dss
+        run: npm run build
+
+  dependency-lock-remediation:
+    name: Commit patched dependency lockfile
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/security/')
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate patched dependency lockfile
+        working-directory: university-ranking-dss
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
+      - name: Commit lockfile changes
         env:
-          TARGET_BRANCH: ${{ github.head_ref }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -87,9 +110,3 @@ jobs:
             git rebase FETCH_HEAD
             git push origin "HEAD:${TARGET_BRANCH}"
           fi
-      - name: Run ESLint
-        working-directory: university-ranking-dss
-        run: npm run lint
-      - name: Build frontend
-        working-directory: university-ranking-dss
-        run: npm run build
