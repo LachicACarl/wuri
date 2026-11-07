@@ -157,7 +157,7 @@ class ResearchApiTests(unittest.TestCase):
             def scan(self, path):
                 return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
         with patch.object(main, "malware_scanner", Scanner()), patch.object(
-            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
         ):
             response = self.client.post(
                 "/api/upload",
@@ -174,7 +174,7 @@ class ResearchApiTests(unittest.TestCase):
                 raise RuntimeError("synthetic scanner failure")
 
         with patch.object(main, "malware_scanner", Scanner()), patch.object(
-            main, "extract_blocks"
+            main, "extract_blocks_isolated"
         ) as parser:
             response = self.client.post(
                 "/api/upload",
@@ -193,7 +193,7 @@ class ResearchApiTests(unittest.TestCase):
                 return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
 
         with patch.object(main, "malware_scanner", Scanner()), patch.object(
-            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
         ), patch.object(main.storage, "delete", side_effect=OSError("synthetic disk error")):
             response = self.client.post(
                 "/api/upload",
@@ -211,7 +211,7 @@ class ResearchApiTests(unittest.TestCase):
                 return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
 
         with patch.object(main, "malware_scanner", Scanner()), patch.object(
-            main, "extract_blocks", side_effect=RuntimeError("synthetic parser failure")
+            main, "extract_blocks_isolated", side_effect=RuntimeError("synthetic parser failure")
         ), patch.object(main.storage, "delete", side_effect=RuntimeError("unexpected cleanup failure")):
             response = self.client.post(
                 "/api/upload",
