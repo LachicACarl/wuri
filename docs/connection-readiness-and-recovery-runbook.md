@@ -3,20 +3,18 @@
 **Status: HOLD — NOT CONNECTED END-TO-END**  
 **Original remediation branch:** `security/recovery-remove-obfuscated-vite-config` (historical; not the current isolated clean-root snapshot)  
 **Current isolated review snapshot:** `security/clean-root-quarantine-2026-11-07`  
-**Supabase project ref:** `oxvejessjvlsyptqfyyc`  
 **This document is a static planning artifact. It does not authorize runtime execution, database access, migrations, or deployment.**
 
 ## 1. What has been verified
 
-- The Supabase account named `wuri` lists project `oxvejessjvlsyptqfyyc`.
-- The project was reported as `ACTIVE_HEALTHY`, region `ap-northeast-2`, PostgreSQL 17.
+- A prior account/project listing observation was recorded in the issue history. It is not re-verified by this static repository review and must not be treated as current provider status.
 - The frontend exists under `university-ranking-dss/`.
 - The earlier frontend prototype expected `POST /api/upload`; that request, form, and file input were subsequently removed from the current clean-root snapshot. No upload endpoint exists. The route appears only as a proposed future backend target in design documents.
-- No backend/API implementation was found in the inspected recovery-branch tree.
+- No backend/API implementation is present in the inspected clean-root branch tree.
 - Authentication remains intentionally locked pending an approved server-side implementation.
-- The original recovery branch inherits suspicious history and must not be merged. The separate clean-root snapshot was created with an orphan root commit, but copied source remains unreviewed and is not cleared to execute.
+- The historical recovery branch inherits suspicious history and must not be treated as the current clean-root source baseline or merged. The separate clean-root snapshot was created with an orphan root commit, but copied source remains unreviewed and is not cleared to execute.
 
-Project listing/status confirms account access and project existence only. It does not confirm application connectivity, database schema readiness, RLS correctness, storage policies, auth configuration, API availability, or key rotation.
+A historical project listing/status observation—if still current—would confirm only account visibility and project existence. This repository review does not re-verify provider status and cannot confirm application connectivity, database schema readiness, RLS correctness, storage policies, auth configuration, API availability, or key rotation.
 
 ## 2. Connection architecture required
 
@@ -118,7 +116,7 @@ Only after explicit runtime/database authorization, verify in this order:
 
 Stop immediately if a secret is found in source/logs, unexpected project identity is observed, RLS permits cross-tenant access, storage is public unexpectedly, document provenance is incomplete, or a result appears without a validated assessment run. Preserve evidence and notify the authorized reviewer/owner.
 
-**No implementation, runtime connection, database inspection/change, credential operation, CI execution, or deployment has been performed by adding this runbook.**
+**This runbook is not evidence of a current Supabase project status. No implementation, runtime connection, database inspection/change, credential operation, CI execution, or deployment has been performed by this repository review.**
 
 
 ## Current clean-root snapshot correction — 2026-11-07
