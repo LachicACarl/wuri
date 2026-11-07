@@ -1,6 +1,6 @@
 # WURI University Ranking Readiness DSS
 
-This repository currently contains a React/Vite frontend in `university-ranking-dss/`.
+This repository currently contains a quarantined React/Vite frontend snapshot in `university-ranking-dss/`. Its application entry is intentionally a non-operational security-hold screen. It is not a functioning ranking readiness system.
 
 ## Frontend location
 
@@ -8,7 +8,7 @@ This repository currently contains a React/Vite frontend in `university-ranking-
 - Main routes and views: `university-ranking-dss/src/App.jsx`
 - Vite configuration: `university-ranking-dss/vite.config.js`
 - Dependencies: `university-ranking-dss/package.json`
-- Dependency lockfile: `university-ranking-dss/package-lock.json`
+- Dependency lockfile: intentionally excluded from this quarantine snapshot pending dependency provenance review
 
 Install/build/test commands are intentionally not documented as approved execution steps while the repository security hold is active.
 
@@ -19,8 +19,8 @@ Install/build/test commands are intentionally not documented as approved executi
 - The suspicious obfuscated code was removed from the current recovery branch's Vite configuration. The original commit and `main` history remain preserved for investigation.
 - The tracked root `node_modules/` directory was removed from the current recovery branch tree. Dependencies must be reviewed and restored only from the committed lockfiles after explicit authorization.
 - A root `.gitignore` excludes dependency directories, build output, local environment files, and logs.
-- The frontend no longer generates readiness scores from hardcoded sample passages and file metadata. It requires a structured response from the assessment API.
-- The frontend's hardcoded demo login was removed. Sign-in is disabled until an approved server-side authentication service is implemented and reviewed.
+- The current `src/App.jsx` contains only a static security-hold screen. It has no upload control, API request, result renderer, session state, scoring constants, or Supabase client.
+- Do not use this snapshot to upload documents or enter credentials. Authentication and all operational features are unavailable.
 
 ## Assessment integrity
 
