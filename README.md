@@ -30,7 +30,7 @@ A backend response is not automatically valid research output merely because it 
 
 ## Connection readiness and recovery
 
-- `docs/connection-readiness-and-recovery-runbook.md` — verified connection boundary, security gates, backend implementation order, and post-approval end-to-end verification sequence. The WURI Supabase project is visible to the connected account, but this does not mean the application is connected to a working backend.
+- `docs/connection-readiness-and-recovery-runbook.md` — documented connection boundary, security gates, backend implementation order, and post-approval end-to-end verification sequence. Current WURI Supabase project identity, provider status, application connectivity, and credential state have not been re-verified by this repository review.
 - `docs/static-system-audit-2026-11-07.md` — static frontend/architecture audit with severity-ranked findings, evidence locations, structural inventory, and remediation order. No runtime commands were executed.
 
 - `docs/current-source-index-2026-11-07.md` — current source tree and verification-status index.
