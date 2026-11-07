@@ -83,9 +83,17 @@ def build_readiness_report() -> dict[str, Any]:
         "ingress_body_limit", "manual_verification_required",
         "Reverse-proxy or hosting ingress request-body limits must be configured and verified separately.",
     ))
+    parser_limits_ready = os.name == "posix"
     checks.append(_check(
-        "parser_process_isolation", "blocked",
-        "Document parsing does not yet run in a separately resource-limited worker process.",
+        "parser_worker_resource_limits",
+        "ready" if parser_limits_ready else "blocked",
+        "Parser workers apply CPU, address-space, file-descriptor, and core-dump limits."
+        if parser_limits_ready else
+        "This platform needs an equivalent worker CPU and memory sandbox before production use.",
+    ))
+    checks.append(_check(
+        "parser_worker_container_isolation", "manual_verification_required",
+        "Process resource limits do not replace container, filesystem, and network isolation.",
     ))
     checks.append(_check(
         "authorization_workflow", "manual_verification_required",
