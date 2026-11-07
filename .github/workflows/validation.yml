@@ -1,48 +1,36 @@
 name: WURI validation
 
-on:
+'on':
   pull_request:
-    branches: [main]
+    branches:
+      - main
   push:
-    branches: [main, "security/**"]
-  workflow_dispatch:
+    branches:
+      - main
+      - 'security/**'
 
 permissions:
   contents: read
 
-concurrency:
-  group: wuri-validation-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   backend-tests:
-    name: Backend tests (Python 3.11)
+    name: Backend tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      PYTHONDONTWRITEBYTECODE: "1"
-      WURI_DATABASE_PATH: ${{ runner.temp }}/wuri-ci.sqlite3
-      WURI_STORAGE_PATH: ${{ runner.temp }}/wuri-ci-private
-      WURI_SESSION_SECRET: "ci-only-session-secret-with-adequate-randomness-91x"
-      WURI_ADMIN_USERNAME: "ci-admin"
-      WURI_ADMIN_PASSWORD: "ci-only-password-not-for-deployment"
-      PIP_DISABLE_PIP_VERSION_CHECK: "1"
     steps:
       - name: Check out source
         uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements-test.txt
-      - name: Install lightweight backend test dependencies
+          python-version: '3.11'
+      - name: Install backend test dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements-test.txt
       - name: Compile Python source and tests
         run: python -m compileall -q backend/app backend/tests
-      - name: Run backend test suite
+      - name: Run backend tests
         working-directory: backend
         run: python -m unittest discover -s tests -v
 
@@ -56,9 +44,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: university-ranking-dss/package-lock.json
+          node-version: '22'
       - name: Install frontend dependencies
         working-directory: university-ranking-dss
         run: npm ci
