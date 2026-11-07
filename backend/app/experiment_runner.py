@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
-from importlib.metadata import version as package_version
+from importlib.metadata import PackageNotFoundError, version as package_version
 import json
 import logging
 import math
@@ -716,7 +716,7 @@ class ResearchExperimentRunner:
                 for package in ("sentence-transformers", "transformers", "torch", "numpy"):
                     try:
                         runtime_dependencies[package] = package_version(package)
-                    except Exception:
+                    except PackageNotFoundError:
                         # Record optional runtime dependencies explicitly when
                         # a custom/test executor does not require the ML stack.
                         runtime_dependencies[package] = "not-installed"
