@@ -88,6 +88,15 @@ class DocumentProcessingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsafe archive path"):
             extract_blocks("unsafe.docx", output.getvalue())
 
+    def test_docx_rejects_windows_absolute_archive_paths(self):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("[Content_Types].xml", "<Types/>")
+            archive.writestr("word/document.xml", "<document/>")
+            archive.writestr("C:\\\\temp\\\\outside.xml", "unsafe")
+        with self.assertRaisesRegex(ValueError, "unsafe archive path"):
+            extract_blocks("windows-path.docx", output.getvalue())
+
 
     def test_segmentation_is_ordered_and_overlaps_long_text(self):
         block = ExtractedBlock("word " * 600, 2, "Evidence", None, None, "test")
