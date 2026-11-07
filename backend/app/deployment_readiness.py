@@ -114,6 +114,12 @@ def build_readiness_report() -> dict[str, Any]:
             parser_limit_detail = (
                 "The parser worker could not be started and verified during readiness checking."
             )
+    if parser_limits_ready and os.getenv("WURI_PARSER_SANDBOX_VERIFIED", "").strip().lower() != "true":
+        parser_limits_ready = False
+        parser_limit_detail = (
+            "The worker resource limits apply, but an administrator has not verified "
+            "the deployment's parser sandbox, filesystem restrictions, and network isolation."
+        )
     checks.append(_check(
         "parser_worker_resource_limits",
         "ready" if parser_limits_ready else "blocked",
