@@ -49,26 +49,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply semver-safe dependency audit fixes to lockfile
-        working-directory: university-ranking-dss
-        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
       - name: Install frontend dependencies
         working-directory: university-ranking-dss
         run: npm ci
-      - name: Report npm dependency advisories
+      - name: Run npm security audit
         working-directory: university-ranking-dss
-        run: |
-          npm audit --json > npm-audit.json || true
-          node -e 'const a = JSON.parse(require("fs").readFileSync("npm-audit.json", "utf8")); console.log("Totals:", JSON.stringify(a.metadata?.vulnerabilities ?? {})); for (const [name, item] of Object.entries(a.vulnerabilities ?? {})) console.log(name + ": " + JSON.stringify(item, null, 2));'
-      - name: Upload dependency remediation preview
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuri-dependency-remediation-preview
-          path: |
-            university-ranking-dss/package-lock.json
-            university-ranking-dss/npm-audit.json
-          retention-days: 1
+        run: npm audit --audit-level=moderate
       - name: Run ESLint
         working-directory: university-ranking-dss
         run: npm run lint
@@ -76,37 +62,3 @@ jobs:
         working-directory: university-ranking-dss
         run: npm run build
 
-  dependency-lock-remediation:
-    name: Commit patched dependency lockfile
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/security/')
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Generate patched dependency lockfile
-        working-directory: university-ranking-dss
-        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
-      - name: Commit lockfile changes
-        env:
-          TARGET_BRANCH: ${{ github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add university-ranking-dss/package-lock.json
-          if git diff --cached --quiet; then
-            echo "The lockfile is already current."
-          else
-            git commit -m "security: update patched frontend dependencies"
-            git fetch origin "${TARGET_BRANCH}"
-            git rebase FETCH_HEAD
-            git push origin "HEAD:${TARGET_BRANCH}"
-          fi
