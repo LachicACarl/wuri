@@ -1,4 +1,4 @@
-import { AlertTriangle, Award, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { Route, Routes } from 'react-router-dom'
 
 function App() {
