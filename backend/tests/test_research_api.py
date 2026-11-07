@@ -221,6 +221,25 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["detail"], "The document could not be extracted.")
 
+    def test_upload_persistence_failure_cleans_temporary_object(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main.database, "persist_document", side_effect=RuntimeError("synthetic database failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["detail"], "The document could not be persisted.")
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
         user_id = self.database.user_by_username("research-admin")["id"]
