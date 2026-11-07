@@ -57,12 +57,27 @@ Proposed roles: administrator, evaluator, viewer. Role assignment must be perfor
 - Session cookie: opaque, unpredictable, server-revocable; set HttpOnly, Secure, and an approved SameSite policy.
 - Cookie path/domain must be as narrow as practical.
 - Rotate session identifiers after authentication and privilege changes.
+- Revoke sessions when an account is disabled, membership is removed, a role is downgraded, or a suspected compromise is handled; define whether a role upgrade also forces re-authentication.
+- Define single-session versus multi-session policy, administrative session revocation, and the maximum revocation propagation delay.
+- Ensure password/identity-provider recovery and security-factor changes invalidate or re-verify active sessions according to the selected provider's capabilities.
 - Expire idle and absolute sessions according to institutional policy.
 - Protect state-changing cookie-authenticated requests against CSRF; validate origin/referer as defense in depth.
 - Configure CORS to exact approved origins; never combine credentialed requests with wildcard origins.
 - Avoid exposing detailed authentication provider errors to the browser.
 
-## 6. Error behavior
+## 6. Session lifecycle decisions required before implementation
+
+The following are mandatory design decisions, not assumptions supplied by this proposal:
+
+- Absolute and idle session lifetimes, including privileged-account policy.
+- Whether refresh-token/session rotation is supported and how reuse is detected.
+- Session revocation behavior on role/membership changes, account disablement, password reset, and suspected compromise.
+- Administrative visibility and revocation of active sessions without exposing session secrets.
+- Behavior when the identity provider is unavailable, including fail-closed behavior for protected operations.
+
+These values must be approved by the institution and documented against the chosen identity provider before coding.
+
+## 7. Error behavior
 
 - 401: no valid authenticated session.
 - 403: authenticated but not authorized for the requested action/resource.
@@ -71,7 +86,7 @@ Proposed roles: administrator, evaluator, viewer. Role assignment must be perfor
 
 The exact error envelope and provider-specific behavior must be finalized with the API contract.
 
-## 7. Frontend integration expectations
+## 8. Frontend integration expectations
 
 Until an approved backend exists:
 - Keep the workspace locked.
@@ -82,7 +97,7 @@ Until an approved backend exists:
 
 After approval, the frontend may call the session endpoint to render authenticated state, but every protected backend route remains authoritative.
 
-## 8. Required review and approvals
+## 9. Required review and approvals
 
 Before implementation:
 - independent security review of the suspicious repository history and exact target commit;
