@@ -104,9 +104,10 @@ class DocumentProcessingTests(unittest.TestCase):
 
     def test_docx_rejects_windows_absolute_and_relative_paths(self):
         unsafe_names = (
-            "C:\\\\temp\\\\outside.xml",
-            "word\\\\..\\\\outside.xml",
-            "word\\\\document.xml",
+            "C:\\temp\\outside.xml",
+            "word\\..\\outside.xml",
+            "word\\document.xml",
+            "\\rooted.xml",
         )
         for unsafe_name in unsafe_names:
             with self.subTest(archive_name=unsafe_name):
