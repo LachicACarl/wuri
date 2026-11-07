@@ -187,3 +187,17 @@ A further source review found that the old upload form still attempted `POST /ap
 - Preserve the prior explicit statements that backend, authentication, database integration, extraction, scoring, and research validation are not implemented.
 
 This reduces attack surface and avoids accidental upload attempts, but it is not the requested functioning application. It is a quarantined UI state pending independent security review, credential containment, and written runtime authorization. No source execution, dependency installation, lint, build, tests, Actions, Supabase access, database changes, or deployment occurred.
+
+
+## Current clean-root UI state correction — 2026-11-07
+
+The current `university-ranking-dss/src/App.jsx` is a 47-line security-hold landing page. The UI is intentionally non-operational and no longer contains the previous dormant upload/results prototype. Static inspection confirms:
+
+- No `/api/upload`, `FormData`, or file input.
+- No frontend Supabase client or database integration.
+- No framework weights, EQAM constants, score validator, dashboard chart, evidence result renderer, XAI result renderer, or session-history component.
+- No real authentication or role authorization.
+- All routes render the security-hold notice. Users are warned not to submit institutional documents or credentials.
+- The previous checklist, architecture, and validation panels are no longer part of the application UI; their descriptions remain in this audit/documentation as proposed design only.
+
+The remaining repository files (including package manifest and configuration) have not been installed, executed, linted, built, or tested. This remains a quarantined static snapshot, not an operational WURI system.
