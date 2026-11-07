@@ -75,10 +75,30 @@ class RequestBodyLimitTests(unittest.TestCase):
             CORSMiddleware,
             allow_origins=["https://trusted.example"],
             allow_credentials=True,
-            allow_methods=["POST"],
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
             allow_headers=["Content-Type"],
         )
         client = TestClient(app)
+
+        patch_preflight = client.options(
+            "/body",
+            headers={
+                "Origin": "https://trusted.example",
+                "Access-Control-Request-Method": "PATCH",
+            },
+        )
+        self.assertEqual(patch_preflight.status_code, 200)
+        self.assertIn("PATCH", patch_preflight.headers.get("access-control-allow-methods", ""))
+
+        delete_preflight = client.options(
+            "/body",
+            headers={
+                "Origin": "https://trusted.example",
+                "Access-Control-Request-Method": "DELETE",
+            },
+        )
+        self.assertEqual(delete_preflight.status_code, 200)
+        self.assertIn("DELETE", delete_preflight.headers.get("access-control-allow-methods", ""))
 
         trusted = client.post(
             "/body", content=b"12345", headers={"Origin": "https://trusted.example"}
