@@ -40,6 +40,12 @@ The following sections from the initial audit described the earlier frontend pro
 
 Those components and associated upload/result logic were subsequently removed from the current clean-root snapshot. Do not use old line references or component names as current source evidence without re-verification.
 
+## Repository entrypoint and static-hosting boundary
+
+The HTML entry `university-ranking-dss/index.html` loads `/src/main.jsx` and references `/favicon.svg`. The tracked favicon exists at `university-ranking-dss/public/favicon.svg`, which matches Vite's public-directory convention by source layout. This is a static path/layout observation only; the path has not been checked by a Vite build or browser request. The favicon artwork is still the Vite starter-style purple/blue mark and is not WURI institutional branding; it is cosmetic cleanup, not a security blocker.
+
+The HTML contains `noindex, nofollow`, but this metadata is not an access-control boundary. The security-hold page must not be treated as private or as protection for confidential content; no confidential content should be hosted in this snapshot.
+
 ## Current static security observations
 
 1. Current `src/App.jsx` renders only the hold notice.
