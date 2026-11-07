@@ -217,3 +217,10 @@ Static inspection of the clean-root tree identifies the implemented frontend tec
 - **ESLint:** static-analysis configuration.
 
 No backend source tree, Python/FastAPI application, Node.js API server, Supabase client, SQL migrations, or server-side scoring implementation appears in this quarantined tree. A dependency name alone does not prove a capability is implemented. This is a static repository inventory, not a dependency/runtime validation.
+
+
+## Starter asset and entrypoint cleanup — 2026-11-07
+
+The isolated UI entrypoint was checked for residual Vite template content. The template-only comment in `src/main.jsx` was removed. The tracked tree contains unused starter assets: `src/assets/react.svg`, `src/assets/vite.svg`, and `public/icons.svg`; these were removed from the quarantined frontend because the active hold page does not reference them. The generic `public/favicon.svg` was retained because `index.html` references it. The binary `src/assets/hero.png` was not modified through the text-only GitHub file interface.
+
+Documentation was clarified to state that proposed API/auth/database documents are design artifacts only and that the frontend has no working backend, authentication, upload, scoring, or Supabase operations. Static tree/source review only; no scripts, dependency install, lint, build, test, or runtime execution.
