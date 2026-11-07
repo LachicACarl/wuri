@@ -221,6 +221,26 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["detail"], "The document could not be extracted.")
 
+    def test_upload_parser_worker_unavailable_returns_503_and_cleans_file(self):
+        self.login()
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main,
+            "extract_blocks_isolated",
+            side_effect=main.ParserWorkerUnavailableError("synthetic worker startup failure"),
+        ):
+            response = self.client.post(
+                "/api/upload",
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(list(self.storage.root.iterdir()), [])
+
     def test_upload_persistence_failure_cleans_temporary_object(self):
         self.login()
 
