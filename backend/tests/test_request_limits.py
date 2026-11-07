@@ -1,6 +1,10 @@
 import asyncio
 import unittest
 
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.testclient import TestClient
+
 from app.request_limits import RequestBodyLimitMiddleware
 
 
@@ -57,31 +61,37 @@ class RequestBodyLimitTests(unittest.TestCase):
         self.assertEqual(messages[0]["status"], 413)
         self.assertIn(b"configured limit", messages[1]["body"])
 
-    def test_early_rejection_includes_cors_headers_for_browser_origin(self):
-        messages = []
+    def test_cors_allowlist_wraps_request_limit_and_blocks_untrusted_origins(self):
+        app = FastAPI()
 
-        async def application(scope, receive, send):
-            self.fail("Oversized request must be rejected before application.")
+        @app.post("/body")
+        async def body(request: Request):
+            await request.body()
+            return {"ok": True}
 
-        async def receive():
-            return {"type": "http.request", "body": b"", "more_body": False}
+        # The last Starlette middleware registered wraps earlier middleware.
+        app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=4)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["https://trusted.example"],
+            allow_credentials=True,
+            allow_methods=["POST"],
+            allow_headers=["Content-Type"],
+        )
+        client = TestClient(app)
 
-        async def send(message):
-            messages.append(message)
+        trusted = client.post(
+            "/body", content=b"12345", headers={"Origin": "https://trusted.example"}
+        )
+        self.assertEqual(trusted.status_code, 413)
+        self.assertEqual(trusted.headers.get("access-control-allow-origin"), "https://trusted.example")
+        self.assertEqual(trusted.headers.get("access-control-allow-credentials"), "true")
 
-        middleware = RequestBodyLimitMiddleware(application, max_body_bytes=4)
-        asyncio.run(middleware(
-            {"type": "http", "headers": [
-                (b"content-length", b"5"),
-                (b"origin", b"http://localhost:5173"),
-            ]},
-            receive,
-            send,
-        ))
-        headers = dict(messages[0]["headers"])
-        self.assertEqual(messages[0]["status"], 413)
-        self.assertEqual(headers[b"access-control-allow-origin"], b"http://localhost:5173")
-        self.assertEqual(headers[b"access-control-allow-credentials"], b"true")
+        untrusted = client.post(
+            "/body", content=b"12345", headers={"Origin": "https://attacker.example"}
+        )
+        self.assertEqual(untrusted.status_code, 413)
+        self.assertIsNone(untrusted.headers.get("access-control-allow-origin"))
 
     def test_non_http_scope_passes_through_without_body_inspection(self):
         called = False
