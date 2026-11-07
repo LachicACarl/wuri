@@ -16,8 +16,8 @@ Install/build/test commands are intentionally not documented as approved executi
 
 **HOLD — NO-GO.** This recovery branch is an isolated remediation candidate, not a security-cleared or production-ready branch.
 
-- The suspicious obfuscated code was removed from the current recovery branch's Vite configuration. The original commit and `main` history remain preserved for investigation.
-- The tracked root `node_modules/` directory was removed from the current recovery branch tree. Dependencies must be independently reviewed and a lockfile regenerated only after explicit authorization.
+- The current clean-root snapshot contains a declarative Vite configuration without the previously identified obfuscated loader. The original suspicious commit remains preserved in `main` history for independent investigation. The original commit and `main` history remain preserved for investigation.
+- The clean-root snapshot contains no tracked `node_modules/` directory. Dependencies must be independently reviewed and a lockfile generated only after explicit authorization.
 - A root `.gitignore` excludes dependency directories, build output, local environment files, and logs.
 - The current `src/App.jsx` contains only a static security-hold screen. It has no upload control, API request, result renderer, session state, scoring constants, or Supabase client.
 - Do not use this snapshot to upload documents or enter credentials. Authentication and all operational features are unavailable.
