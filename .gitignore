@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+**/dist/
+**/.vite/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/venv/
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.db
+backend/data/
+backend/private/
