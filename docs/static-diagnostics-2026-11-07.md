@@ -68,7 +68,7 @@ The backend implementation plan, assessment API, authentication, and database sc
 
 ## Review package / pull-request comparison note — 2026-11-07
 
-PR #2 currently targets `security/clean-root-quarantine-2026-11-07` and its head branch adds only `REVIEW-ONLY.md`; GitHub reports one changed file. It does not contain the full source remediation diff. The clean-root branch advances independently of this report; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. Do not rely on an old pinned SHA in this report. PR #2 is a reviewer-index handoff only, not a source-remediation PR. Do not merge it into `main`.
+PR #2 (`[DRAFT REVIEW HANDOFF ONLY] WURI clean-root snapshot index`) is **closed and merged**. GitHub reports that it merged on 2026-11-07 into `security/clean-root-quarantine-2026-11-07`, with merge commit `41d3e72e12f6f659132f29f681fbbd8c71c224f2`; it did **not** merge into `main`. Its only changed file was `REVIEW-ONLY.md` (one file), so it is a reviewer-index handoff only, not a source-remediation PR and not implementation approval. The clean-root branch advances independently of this report; reviewers must verify the live branch head before review and inspect the complete clean-root tree directly. Do not rely on an old pinned SHA in this report. Keep the security hold and all execution/implementation gates in force.
 
 
 ## Historical suspicious configuration — exact static evidence
