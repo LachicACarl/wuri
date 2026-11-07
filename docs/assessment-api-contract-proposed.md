@@ -1,8 +1,8 @@
 # WURI Assessment API Contract (Proposed — Not Implemented)
 
 **Status:** DESIGN ONLY — NOT AN AUTHORIZATION TO IMPLEMENT OR RUN  
-**Frontend target:** `POST /api/upload`  
-**Current repository finding:** No backend/API source directory is present in the recovery branch tree. This contract documents the frontend expectations; it does not prove an API exists.
+**Proposed future backend target:** `POST /api/upload` (not used by the current frontend)  
+**Current repository finding:** No backend/API source directory is present in the clean-root branch tree. The previous frontend upload integration was removed. This document is a proposed future API contract only; it does not describe a current frontend expectation or prove an API exists.
 
 ## Request
 
@@ -17,7 +17,7 @@ The server must enforce authentication, authorization, file-size limits, content
 
 ## Success response
 
-The frontend currently expects a structured assessment response with these fields:
+A future approved frontend/backend integration may adopt a structured assessment response with fields such as these:
 
 ```json
 {
@@ -95,7 +95,7 @@ Before implementation, obtain:
 
 Any schema change must be reviewed against:
 - the dissertation methodology and approved data dictionary;
-- the frontend validator in `university-ranking-dss/src/App.jsx`;
+- an approved future frontend response validator (none exists in the current security-hold UI);
 - authentication and authorization design;
 - evidence provenance and audit requirements;
 - versioning and backward-compatibility rules.
