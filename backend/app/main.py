@@ -500,6 +500,18 @@ async def _read_upload_limited(file: UploadFile) -> bytes:
     return b"".join(chunks)
 
 
+def _delete_temporary_upload(storage_key: str | None) -> None:
+    """Best-effort cleanup that must never hide the original upload failure."""
+    if not storage_key:
+        return
+    try:
+        storage.delete(storage_key)
+    except (OSError, ValueError):
+        # Keep the request fail-closed; a deployment should separately alert
+        # on storage cleanup failures and run a private-object reconciliation.
+        pass
+
+
 @app.post("/api/upload")
 async def upload_document(
     file: UploadFile = File(...),
@@ -536,35 +548,41 @@ async def upload_document(
     _validate_upload_content(extension, content)
 
     storage_key = None
+    checksum = None
     try:
         storage_key, checksum = storage.save(content, extension)
+    except OSError as error:
+        raise HTTPException(
+            status_code=503, detail="Private document storage is unavailable."
+        ) from error
+
+    try:
         scan = malware_scanner.scan(storage.root / storage_key)
-        if scan.status == "infected":
-            raise HTTPException(status_code=422, detail="The uploaded document failed malware scanning.")
-        if scan.status != "clean":
-            raise HTTPException(status_code=503, detail="Malware scanning is unavailable.")
+    except Exception as error:
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(
+            status_code=503, detail="Malware scanning is unavailable."
+        ) from error
+
+    if scan.status == "infected":
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(status_code=422, detail="The uploaded document failed malware scanning.")
+    if scan.status != "clean":
+        _delete_temporary_upload(storage_key)
+        raise HTTPException(status_code=503, detail="Malware scanning is unavailable.")
+
+    try:
         blocks = extract_blocks(filename, content)
-    except HTTPException:
-        if storage_key:
-            storage.delete(storage_key)
-        raise
     except Exception as error:
         # Parser libraries can raise format-specific exceptions outside the
         # common ValueError/RuntimeError hierarchy. Fail closed and clean up.
-        if storage_key:
-            try:
-                storage.delete(storage_key)
-            except OSError:
-                pass
-        if isinstance(error, HTTPException):
-            raise error
+        _delete_temporary_upload(storage_key)
         raise HTTPException(
             status_code=422, detail="The document could not be extracted."
         ) from error
 
     if not blocks:
-        if storage_key:
-            storage.delete(storage_key)
+        _delete_temporary_upload(storage_key)
         raise HTTPException(status_code=422, detail="The document contains no extractable text.")
 
     document_id = str(uuid4())
