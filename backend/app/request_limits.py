@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 class _RequestBodyTooLarge(Exception):
     pass
 
@@ -19,7 +20,6 @@ class RequestBodyLimitMiddleware:
             return
 
         headers = dict(scope.get("headers", []))
-        cors_origin = headers.get(b"origin")
         raw_length = headers.get(b"content-length")
         if raw_length is not None:
             try:
@@ -27,7 +27,7 @@ class RequestBodyLimitMiddleware:
             except (TypeError, ValueError):
                 declared_length = None
             if declared_length is not None and declared_length > self.max_body_bytes:
-                await self._reject(send, cors_origin)
+                await self._reject(send)
                 return
 
         received_bytes = 0
@@ -44,24 +44,17 @@ class RequestBodyLimitMiddleware:
         try:
             await self.app(scope, limited_receive, send)
         except _RequestBodyTooLarge:
-            await self._reject(send, cors_origin)
+            await self._reject(send)
 
     @staticmethod
-    async def _reject(send, cors_origin=None):
+    async def _reject(send):
         body = b'{"detail":"Request body exceeds the configured limit."}'
-        headers = [
-            (b"content-type", b"application/json"),
-            (b"content-length", str(len(body)).encode("ascii")),
-        ]
-        if cors_origin:
-            headers.extend([
-                (b"access-control-allow-origin", cors_origin),
-                (b"access-control-allow-credentials", b"true"),
-                (b"vary", b"Origin"),
-            ])
         await send({
             "type": "http.response.start",
             "status": 413,
-            "headers": headers,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("ascii")),
+            ],
         })
         await send({"type": "http.response.body", "body": body})
