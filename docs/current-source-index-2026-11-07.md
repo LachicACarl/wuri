@@ -48,3 +48,8 @@ The current clean-root branch is a static quarantine snapshot, not a runnable re
 The frontend manifest currently declares development, build, lint, and preview scripts, but no lockfile or automated test script exists. Their presence is not evidence of a working application, and none was executed during static review. Dependency restoration, lockfile creation, lint/build, local startup, CI, and tests require separate written authorization after security clearance.
 
 A review of this snapshot must not be described as a review of the historical `main` code, and clearing the historical configuration must not automatically authorize this orphan-lineage snapshot to run. Record the exact implementation branch/base commit and allowed commands separately before any executable work.
+
+
+## Last reconciled static review — 2026-11-08
+
+The live HTML still has no favicon link; `public/favicon.svg` exists but is not referenced by `index.html`. The active page is standalone HTML/CSS and the tracked React hold component remains unmounted. The security-hold issue still has no independent reviewer or authorized Supabase-owner confirmation in its comments as of this review. No implementation/runtime authorization is evidenced by this documentation update. See `docs/static-diagnostics-2026-11-07.md` for the source-level limitation and `docs/security-hold-clearance-evidence-checklist.md` for required evidence.
