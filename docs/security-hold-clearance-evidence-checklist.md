@@ -6,13 +6,13 @@
 
 ## 1. Repository-side remediation observed
 
-The current clean-root review snapshot contains the following source-level changes:
+The current clean-root review snapshot contains the following source-level observations (static review only):
 
 - The clean-root Vite configuration is declarative and contains React/Tailwind plugins; historical suspicious commits remain preserved outside this orphan lineage for independent review.
 - Root `node_modules/` is absent from the current branch tree; root ignore rules exclude dependencies, build outputs, local environment files, and logs.
 - The clean-root frontend now contains only a static security-hold screen. No upload control, API request, results renderer, scoring constants, frontend authentication state, or Supabase client remains in the current UI.
 - No client-side sign-in is implemented. Authentication is unavailable until an approved server-side service is built and reviewed.
-- Root README documents the project structure, hold, and restrictions.
+- Root README and source-index documents describe the project structure, hold, and restrictions. The active HTML is a standalone static page; no React entrypoint is present.
 
 These changes do **not** establish that historical commits or dependency artifacts were safe, that the suspicious code was never executed, or that any credential was revoked. Older project-listing notes are not live provider-state evidence and must be re-confirmed directly by the authorized owner.
 
@@ -83,3 +83,8 @@ These are not completed:
 Do not merge this branch, rewrite or delete historical evidence, execute the suspicious historical revision, install dependencies, start the application, run builds/tests, trigger CI, connect to Supabase, rotate credentials through an unconfirmed actor, migrate data, or deploy until the relevant approvals are documented.
 
 This checklist is an internal tracking aid. It is not a forensic report, credential-rotation confirmation, independent review, or authorization.
+
+
+## 7. Latest evidence reconciliation — 2026-11-08
+
+A fresh read of GitHub Issue #1 found no new comments from an independent security reviewer or authorized Supabase owner; the comments available for this review are authored by the repository owner. Therefore SEC-02 through SEC-08 remain OPEN, and AUTH-02 through AUTH-07 remain NOT AUTHORIZED. A general maintainer request to continue does not close those gates. This dated note is a repository-status observation only, not a reviewer finding or key-rotation verification.
