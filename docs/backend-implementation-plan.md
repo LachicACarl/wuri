@@ -5,7 +5,7 @@
 
 ## 1. Current verified repository boundary
 
-The current clean-root snapshot (`security/clean-root-quarantine-2026-11-07`) contains a React/Vite frontend under `university-ranking-dss/` that renders only a static security-hold screen. No backend, API, or server source directory is present in the inspected tree.
+The current clean-root snapshot (`security/clean-root-quarantine-2026-11-07`) contains a standalone static HTML/CSS security-hold page in `university-ranking-dss/index.html`, plus an unmounted React component and Vite configuration. `src/main.jsx` is absent and `index.html` has no module script; do not describe this snapshot as an active React application. No backend, API, or server source directory is present in the inspected tree.
 
 The earlier prototype had a `POST /api/upload` integration, but that request, file input, and upload form were removed from the current clean-root snapshot. The current frontend does not call `/api/upload`; no handler exists. Login and authentication are unavailable because no reviewed server-side authentication service is implemented.
 
