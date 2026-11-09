@@ -793,13 +793,46 @@ def delete_document(
 ):
     user = current_user(session)
     try:
-        storage_key = database.delete_document(user["id"], document_id)
-        storage.delete(storage_key)
+        storage_key = database.document_storage_key_for_deletion(user["id"], document_id)
+        staged_key = storage.stage_delete(storage_key)
+        try:
+            database.delete_document(user["id"], document_id)
+        except Exception as deletion_error:
+            if staged_key:
+                try:
+                    storage.restore_staged_delete(staged_key, storage_key)
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "Unable to restore staged document %s after database deletion failed.",
+                        document_id,
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Document deletion failed; private-file recovery is required.",
+                    ) from deletion_error
+            raise
+        if staged_key:
+            try:
+                storage.finalize_staged_delete(staged_key)
+            except OSError:
+                logging.getLogger(__name__).exception(
+                    "Document %s was removed from the database but its staged file needs cleanup.",
+                    document_id,
+                )
+                return {
+                    "deleted": True,
+                    "cleanup_pending": True,
+                    "document_id": document_id,
+                }
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
-    except (OSError, ValueError) as error:
-        raise HTTPException(status_code=500, detail="Document storage cleanup failed.") from error
-    return {"deleted": True, "document_id": document_id}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(
+            status_code=503, detail="Private document storage is unavailable."
+        ) from error
+    return {"deleted": True, "cleanup_pending": False, "document_id": document_id}
 
 
 @app.get("/api/research/validation/status")
