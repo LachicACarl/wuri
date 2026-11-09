@@ -67,8 +67,8 @@ class MigrationRunnerTests(unittest.TestCase):
             apply_migration(
                 self.connection,
                 "004_research_import_and_annotations.sql",
-                "CREATE TABLE temporary_rebuild (id TEXT);\\n"
-                "INSERT INTO missing_table VALUES (1);\\n",
+                "CREATE TABLE temporary_rebuild (id TEXT);\n"
+                "INSERT INTO missing_table VALUES (1);\n",
                 disable_foreign_keys=True,
             )
 
