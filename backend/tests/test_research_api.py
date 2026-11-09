@@ -572,11 +572,13 @@ class ResearchApiTests(unittest.TestCase):
         second_result = []
         errors = []
 
+        original_stage = self.storage.stage_delete
+
         def blocking_stage(key):
             entered_stage.set()
             if not release_stage.wait(timeout=5):
                 raise TimeoutError("Concurrent deletion test did not release stage.")
-            return self.storage.stage_delete(key)
+            return original_stage(key)
 
         def first_delete():
             try:
