@@ -562,6 +562,64 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(status["status"], "completed")
         self.assertEqual(status["attempts"], 1)
 
+
+    def test_cleanup_claim_is_exclusive_and_stale_lease_can_be_reclaimed(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "a" * 32, "synthetic lease test",
+        )
+
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
+
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET claimed_at = datetime('now', '-6 minutes')
+                   WHERE id = ?""",
+                (cleanup_id,),
+            )
+        stale = self.database.pending_storage_cleanups(user_id)
+        self.assertTrue(any(item["id"] == cleanup_id for item in stale))
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+
+        self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.database.connection() as connection:
+            status = connection.execute(
+                "SELECT status, claimed_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup_id,),
+            ).fetchone()
+        self.assertEqual(status["status"], "completed")
+        self.assertIsNone(status["claimed_at"])
+
+    def test_cleanup_claim_and_completion_require_current_admin_membership(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "b" * 32, "synthetic authorization test",
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships
+                   SET status = 'inactive'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.assertRaises(PermissionError):
+            self.database.record_storage_cleanup_failure(
+                user_id, cleanup_id, "synthetic failure"
+            )
+
     def _create_document_for_delete(self):
         user_id = self.database.user_by_username("research-admin")["id"]
         institution_id = self.database.institutions_for_user(user_id)[0]["id"]
