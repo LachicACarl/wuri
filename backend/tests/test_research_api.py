@@ -707,6 +707,67 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(first_id, second_id)
         self.assertEqual(events, 2)
 
+
+    def test_cleanup_items_are_scoped_to_the_authorized_institution(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        other_institution_id = "institution-not-owned-by-admin"
+        with self.database.connection() as connection:
+            connection.execute(
+                """INSERT INTO institutions (id, name, code, status)
+                   VALUES (?, ?, ?, 'active')""",
+                (other_institution_id, "Other institution", "OTHER-ISO"),
+            )
+            connection.execute(
+                """INSERT INTO institution_memberships
+                   (id, institution_id, user_id, role, status)
+                   VALUES (?, ?, ?, 'administrator', 'active')""",
+                ("membership-other", other_institution_id, "other-admin-user"),
+            )
+
+        foreign_cleanup = self.database.enqueue_storage_cleanup(
+            "other-admin-user", other_institution_id, "foreign-document",
+            ".wuri-delete-" + "e" * 32, "cross-institution isolation",
+        )
+        self.assertFalse(
+            self.database.claim_storage_cleanup(user_id, foreign_cleanup)
+        )
+        visible = self.database.pending_storage_cleanups(user_id)
+        self.assertFalse(any(item["id"] == foreign_cleanup for item in visible))
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, foreign_cleanup)
+        with self.assertRaises(PermissionError):
+            self.database.record_storage_cleanup_failure(
+                user_id, foreign_cleanup, "unauthorized attempt",
+            )
+
+    def test_cleanup_enqueue_rejects_non_admin_in_same_institution(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with self.database.connection() as connection:
+            membership = connection.execute(
+                """SELECT institution_id FROM institution_memberships
+                   WHERE user_id = (
+                     SELECT id FROM users WHERE username = 'research-admin'
+                   ) AND status = 'active' LIMIT 1"""
+            ).fetchone()
+            institution_id = membership["institution_id"]
+            connection.execute(
+                """UPDATE institution_memberships SET role = 'researcher'
+                   WHERE user_id = (
+                     SELECT id FROM users WHERE username = 'research-admin'
+                   ) AND institution_id = ?""",
+                (institution_id,),
+            )
+        user_id = self.database.user_by_username("research-admin")["id"]
+        with self.assertRaises(PermissionError):
+            self.database.enqueue_storage_cleanup(
+                user_id, institution_id, document_id,
+                ".wuri-delete-" + "f" * 32, "non-admin rejection",
+            )
+
     def test_cleanup_claim_and_completion_require_current_admin_membership(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
