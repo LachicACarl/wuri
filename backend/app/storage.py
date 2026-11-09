@@ -32,14 +32,35 @@ class PrivateStorage:
             raise
         return key, checksum
 
-    def delete(self, key: str):
+    def _path(self, key: str) -> Path:
         candidate = (self.root / key).resolve()
         if candidate.parent != self.root.resolve():
             raise ValueError("Invalid storage key.")
-        candidate.unlink(missing_ok=True)
+        return candidate
+
+    def stage_delete(self, key: str) -> str | None:
+        """Atomically hide a file before its database record is removed."""
+        candidate = self._path(key)
+        if not candidate.exists():
+            return None
+        staged_key = f".wuri-delete-{uuid.uuid4().hex}"
+        os.replace(candidate, self._path(staged_key))
+        return staged_key
+
+    def restore_staged_delete(self, staged_key: str, original_key: str):
+        """Restore a staged file when the database deletion does not commit."""
+        staged = self._path(staged_key)
+        original = self._path(original_key)
+        if staged.exists():
+            if original.exists():
+                raise FileExistsError("Original storage object already exists.")
+            os.replace(staged, original)
+
+    def finalize_staged_delete(self, staged_key: str):
+        self._path(staged_key).unlink(missing_ok=True)
+
+    def delete(self, key: str):
+        self._path(key).unlink(missing_ok=True)
 
     def read(self, key: str) -> bytes:
-        candidate = (self.root / key).resolve()
-        if candidate.parent != self.root.resolve():
-            raise ValueError("Invalid storage key.")
-        return candidate.read_bytes()
+        return self._path(key).read_bytes()
