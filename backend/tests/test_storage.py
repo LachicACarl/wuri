@@ -31,6 +31,27 @@ class PrivateStorageTests(unittest.TestCase):
 
         self.assertEqual(list(self.root.iterdir()), [])
 
+
+    def test_storage_rejects_symlink_escape(self):
+        outside = self.root.parent / (self.root.name + "-outside.txt")
+        outside.write_text("do not read", encoding="utf-8")
+        link = self.root / "escape.txt"
+        try:
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            outside.unlink(missing_ok=True)
+            self.skipTest("Symlink creation is not permitted on this platform.")
+        try:
+            with self.assertRaisesRegex(ValueError, "Invalid storage key"):
+                self.storage.read("escape.txt")
+            with self.assertRaisesRegex(ValueError, "Invalid storage key"):
+                self.storage.delete("escape.txt")
+            self.assertTrue(outside.exists())
+            self.assertEqual(outside.read_text(encoding="utf-8"), "do not read")
+        finally:
+            link.unlink(missing_ok=True)
+            outside.unlink(missing_ok=True)
+
     def test_storage_rejects_path_traversal_keys(self):
         with self.assertRaisesRegex(ValueError, "Invalid storage key"):
             self.storage.read("../outside.txt")
