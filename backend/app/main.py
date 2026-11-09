@@ -793,7 +793,7 @@ def delete_document(
 ):
     user = current_user(session)
     try:
-        storage_key = database.document_storage_key_for_deletion(user["id"], document_id)
+        storage_key, institution_id = database.document_storage_key_for_deletion(user["id"], document_id)
         staged_key = storage.stage_delete(storage_key)
         try:
             database.delete_document(user["id"], document_id)
@@ -814,11 +814,25 @@ def delete_document(
         if staged_key:
             try:
                 storage.finalize_staged_delete(staged_key)
-            except OSError:
+            except OSError as cleanup_error:
                 logging.getLogger(__name__).exception(
                     "Document %s was removed from the database but its staged file needs cleanup.",
                     document_id,
                 )
+                try:
+                    database.enqueue_storage_cleanup(
+                        user["id"], institution_id, document_id, staged_key,
+                        "Final deletion failed: " + type(cleanup_error).__name__,
+                    )
+                except Exception as queue_error:
+                    logging.getLogger(__name__).exception(
+                        "Unable to persist cleanup queue entry for document %s.",
+                        document_id,
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail="The document was deleted, but private-file cleanup needs manual recovery.",
+                    ) from queue_error
                 return {
                     "deleted": True,
                     "cleanup_pending": True,
@@ -833,6 +847,36 @@ def delete_document(
             status_code=503, detail="Private document storage is unavailable."
         ) from error
     return {"deleted": True, "cleanup_pending": False, "document_id": document_id}
+
+
+@app.post("/api/storage/cleanup/reconcile")
+def reconcile_storage_cleanup(
+    session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+):
+    user = current_user(session)
+    pending = database.pending_storage_cleanups(user["id"], limit=50)
+    deleted = 0
+    failed = 0
+    for item in pending:
+        try:
+            storage.delete_staged(item["storage_key"])
+            database.complete_storage_cleanup(user["id"], item["id"])
+            deleted += 1
+        except OSError as error:
+            failed += 1
+            database.record_storage_cleanup_failure(
+                user["id"], item["id"],
+                "Staged object cleanup failed: " + type(error).__name__,
+            )
+            logging.getLogger(__name__).exception(
+                "Staged storage cleanup %s failed.", item["id"],
+            )
+    return {
+        "checked": len(pending),
+        "deleted": deleted,
+        "failed": failed,
+        "remaining": len(database.pending_storage_cleanups(user["id"], limit=100)),
+    }
 
 
 @app.get("/api/research/validation/status")
