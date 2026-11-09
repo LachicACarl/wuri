@@ -471,6 +471,78 @@ class ResearchApiTests(unittest.TestCase):
                 connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
             )
 
+    def test_document_delete_storage_stage_failure_keeps_database_record(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "stage_delete", side_effect=OSError("synthetic storage failure")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 503)
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+
+    def test_document_delete_database_failure_restores_staged_file(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.database, "delete_document", side_effect=PermissionError("synthetic database denial")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+
+    def test_document_delete_reports_quarantined_file_cleanup(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete", side_effect=OSError("synthetic unlink failure")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["cleanup_pending"])
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+        staged_files = list(self.storage.root.glob(".wuri-delete-*"))
+        self.assertEqual(len(staged_files), 1)
+        self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
+
+    def _create_document_for_delete(self):
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        assessment_id = self.database.create_assessment(
+            user_id, institution_id, "document_extracted"
+        )
+        payload = b"synthetic delete fixture"
+        storage_key, checksum = self.storage.save(payload, ".txt")
+        document_id = str(main.uuid4())
+        self.database.persist_document(
+            user_id,
+            institution_id,
+            assessment_id,
+            {
+                "document_id": document_id,
+                "filename": "delete-me.txt",
+                "file_type": "txt",
+                "file_size": len(payload),
+                "checksum": checksum,
+                "storage_key": storage_key,
+                "extraction_status": "success",
+            },
+            [],
+            [],
+        )
+        return document_id, storage_key, assessment_id
+
     def _act_as(self, user_id):
         secret = os.environ["WURI_SESSION_SECRET"]
         token = main.create_session_token(user_id, secret)
