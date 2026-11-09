@@ -858,6 +858,8 @@ def reconcile_storage_cleanup(
     deleted = 0
     failed = 0
     for item in pending:
+        if not database.claim_storage_cleanup(user["id"], item["id"]):
+            continue
         try:
             storage.delete_staged(item["storage_key"])
             database.complete_storage_cleanup(user["id"], item["id"])
