@@ -273,6 +273,55 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "The document could not be persisted.")
         self.assertEqual(list(self.storage.root.iterdir()), [])
 
+        user_id = self.database.user_by_username("research-admin")["id"]
+        records = self.database.assessments(user_id)
+        self.assertEqual(len(records), 1)
+        assessment = records[0]
+        self.assertEqual(assessment["status"], "failed")
+        self.assertEqual(
+            assessment["failure_reason"],
+            "Document processing or persistence failed.",
+        )
+        detail = self.client.get(f"/api/assessments/{assessment['id']}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(
+            detail.json()["assessment"]["failure_reason"],
+            "Document processing or persistence failed.",
+        )
+
+    def test_upload_failure_on_existing_assessment_preserves_workflow_status(self):
+        self.login()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        assessment_id = self.database.create_assessment(
+            user_id, institution_id, "evidence_extracted"
+        )
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main.database, "persist_document", side_effect=RuntimeError("synthetic database failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                params={"assessment_id": assessment_id, "institution_id": institution_id},
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        detail = self.client.get(f"/api/assessments/{assessment_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["assessment"]["status"], "evidence_extracted")
+        with self.database.connection() as connection:
+            event = connection.execute(
+                """SELECT event_type FROM audit_events
+                   WHERE assessment_id = ? AND event_type = 'document.upload_failed'""",
+                (assessment_id,),
+            ).fetchone()
+        self.assertIsNotNone(event)
+
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
         user_id = self.database.user_by_username("research-admin")["id"]
