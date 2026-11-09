@@ -572,14 +572,13 @@ class ResearchApiTests(unittest.TestCase):
         results = {}
         errors = []
 
+        token = self.client.cookies.get(main.SESSION_COOKIE)
+
         def invoke_delete(name):
             try:
-                results[name] = main.delete_document(
-                    document_id,
-                    self.client.cookies.get(main.SESSION_COOKIE),
-                )
-            except HTTPException as error:
-                errors.append(error.status_code)
+                results[name] = main.delete_document(document_id, token)
+            except BaseException as error:
+                errors.append((type(error).__name__, str(error)))
 
         with patch.object(self.storage, "stage_delete", side_effect=blocking_stage):
             first = threading.Thread(target=invoke_delete, args=("first",))
@@ -593,7 +592,7 @@ class ResearchApiTests(unittest.TestCase):
 
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
-        self.assertEqual(len(results), 2)
+        self.assertEqual(len(results), 2, f"results={results!r}, errors={errors!r}")
         self.assertEqual(sum(1 for value in results.values()
                              if isinstance(value, dict) and value.get("deleted")), 1)
         self.assertEqual(errors, [])
