@@ -577,6 +577,11 @@ class ResearchApiTests(unittest.TestCase):
         def invoke_delete(name):
             try:
                 results[name] = main.delete_document(document_id, token)
+            except HTTPException as error:
+                if error.status_code == 403:
+                    results[name] = {"deleted": False, "status_code": 403}
+                else:
+                    errors.append((type(error).__name__, str(error)))
             except BaseException as error:
                 errors.append((type(error).__name__, str(error)))
 
@@ -593,8 +598,12 @@ class ResearchApiTests(unittest.TestCase):
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
         self.assertEqual(len(results), 2, f"results={results!r}, errors={errors!r}")
-        self.assertEqual(sum(1 for value in results.values()
-                             if isinstance(value, dict) and value.get("deleted")), 1)
+        self.assertEqual(
+            sorted(value.get("status_code", 200) for value in results.values()),
+            [200, 403],
+            f"unexpected concurrent delete outcomes: {results!r}",
+        )
+        self.assertEqual(sum(1 for value in results.values() if value.get("deleted")), 1)
         self.assertEqual(errors, [])
         self.assertFalse((self.storage.root / storage_key).exists())
         with self.database.connection() as connection:
