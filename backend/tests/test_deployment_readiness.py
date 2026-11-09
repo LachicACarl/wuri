@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -93,7 +94,7 @@ class DeploymentReadinessTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "WURI_MALWARE_SCANNER_COMMAND": "python",
+                "WURI_MALWARE_SCANNER_COMMAND": sys.executable,
                 "WURI_MALWARE_SCANNER_VERIFIED": "true",
             },
             clear=True,

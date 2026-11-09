@@ -84,6 +84,43 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    def test_cors_allows_readiness_updates_only_for_trusted_origins(self):
+        path = "/api/institutions/synthetic-cors-institution/readiness"
+        origin = "http://localhost:5173"
+        headers = {
+            "Origin": origin,
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "Content-Type",
+        }
+        preflight = self.client.options(path, headers=headers)
+        self.assertEqual(preflight.status_code, 200, preflight.text)
+        self.assertEqual(preflight.headers.get("access-control-allow-origin"), origin)
+        self.assertEqual(preflight.headers.get("access-control-allow-credentials"), "true")
+        self.assertIn("PUT", preflight.headers.get("access-control-allow-methods", ""))
+
+        untrusted = self.client.options(
+            path, headers={**headers, "Origin": "https://attacker.example"},
+        )
+        self.assertEqual(untrusted.status_code, 400)
+        self.assertIsNone(untrusted.headers.get("access-control-allow-origin"))
+
+        unsupported = self.client.options(
+            path, headers={**headers, "Access-Control-Request-Method": "TRACE"},
+        )
+        self.assertEqual(unsupported.status_code, 400)
+
+        # A successful preflight must not bypass the endpoint's session check.
+        unauthenticated = self.client.put(
+            path,
+            headers={"Origin": origin},
+            json={
+                "framework_id": "WURI",
+                "framework_edition": "2026",
+                "criterion_id": "Industrial Application",
+            },
+        )
+        self.assertEqual(unauthenticated.status_code, 401)
+
     def test_session_status_restores_authenticated_user_without_exposing_password(self):
         self.login()
         response = self.client.get("/api/auth/session")
