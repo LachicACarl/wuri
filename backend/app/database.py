@@ -643,11 +643,39 @@ class Database:
                    JOIN institution_memberships m
                      ON m.institution_id = q.institution_id
                    WHERE m.user_id = ? AND m.status = 'active'
-                     AND m.role = 'administrator' AND q.status = 'pending'
+                     AND m.role = 'administrator'
+                     AND (
+                       q.status = 'pending'
+                       OR (q.status = 'processing'
+                           AND q.claimed_at < datetime('now', '-5 minutes'))
+                     )
                    ORDER BY q.created_at ASC LIMIT ?""",
                 (user_id, max(1, min(int(limit), 100))),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def claim_storage_cleanup(self, user_id: str, cleanup_id: str) -> bool:
+        """Atomically lease one pending or abandoned cleanup item to an admin."""
+        with self.connection() as connection:
+            cursor = connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET status = 'processing', claimed_at = CURRENT_TIMESTAMP,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?
+                     AND (
+                       status = 'pending'
+                       OR (status = 'processing'
+                           AND claimed_at < datetime('now', '-5 minutes'))
+                     )
+                     AND EXISTS (
+                       SELECT 1 FROM institution_memberships m
+                       WHERE m.user_id = ? AND m.institution_id =
+                             storage_cleanup_queue.institution_id
+                         AND m.status = 'active' AND m.role = 'administrator'
+                     )""",
+                (cleanup_id, user_id),
+            )
+            return cursor.rowcount == 1
 
     def record_storage_cleanup_failure(
         self, user_id: str, cleanup_id: str, safe_reason: str,
@@ -655,9 +683,10 @@ class Database:
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
-                   SET attempts = attempts + 1, reason = ?,
+                   SET status = 'pending', claimed_at = NULL,
+                       attempts = attempts + 1, reason = ?,
                        updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ? AND status = 'pending'
+                   WHERE id = ? AND status = 'processing'
                      AND EXISTS (
                        SELECT 1 FROM institution_memberships m
                        WHERE m.user_id = ? AND m.institution_id =
@@ -673,9 +702,10 @@ class Database:
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
-                   SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
+                   SET status = 'completed', claimed_at = NULL,
+                       completed_at = CURRENT_TIMESTAMP,
                        updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ? AND status = 'pending'
+                   WHERE id = ? AND status = 'processing'
                      AND EXISTS (
                        SELECT 1 FROM institution_memberships m
                        WHERE m.user_id = ? AND m.institution_id =
