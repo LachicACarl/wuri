@@ -56,6 +56,36 @@ class MigrationRunnerTests(unittest.TestCase):
             connection.close()
 
 
+
+    def test_database_initializer_records_migration_010_on_disposable_database(self):
+        import tempfile
+        from pathlib import Path
+        from app.database import Database
+
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "migration-integration.sqlite3"
+            database = Database(database_path)
+            with database.connection() as connection:
+                self.assertIsNotNone(
+                    connection.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' "
+                        "AND name='storage_cleanup_queue'"
+                    ).fetchone()
+                )
+                self.assertIsNotNone(
+                    connection.execute(
+                        "SELECT 1 FROM schema_migrations "
+                        "WHERE migration_name = ?",
+                        ("010_storage_cleanup_queue.sql",),
+                    ).fetchone()
+                )
+                self.assertEqual(
+                    connection.execute("PRAGMA foreign_key_check").fetchall(), []
+                )
+                self.assertEqual(
+                    connection.execute("PRAGMA foreign_keys").fetchone()[0], 1
+                )
+
     def test_failed_migration_restores_foreign_keys_and_can_restart(self):
         self.connection.execute("CREATE TABLE parent (id TEXT PRIMARY KEY)")
         self.connection.execute(
