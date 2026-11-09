@@ -66,4 +66,9 @@ def apply_migration(
         raise
     finally:
         if disable_foreign_keys:
+            # Restore the connection invariant even when migration execution fails.
+            # This is deliberately outside the transaction; SQLite ignores this
+            # pragma while a transaction is active, so rollback must have run first.
             connection.execute("PRAGMA foreign_keys = ON")
+            if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+                raise RuntimeError("SQLite foreign-key enforcement could not be restored.")
