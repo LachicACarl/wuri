@@ -590,8 +590,8 @@ class ResearchApiTests(unittest.TestCase):
         self.assertTrue(acquired.is_set())
 
         first = main.delete_document(document_id, token)
-        self.assertEqual(first.status_code, 200)
-        self.assertTrue(json.loads(first.body)["deleted"])
+        self.assertIsInstance(first, dict)
+        self.assertTrue(first["deleted"])
         with self.assertRaises(HTTPException) as denied:
             main.delete_document(document_id, token)
         self.assertEqual(denied.exception.status_code, 403)
