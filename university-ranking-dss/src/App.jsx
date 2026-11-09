@@ -1432,12 +1432,13 @@ const HistoryView = () => {
       {assessments.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left">
+            <table className="w-full min-w-[900px] text-left">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase text-slate-500">
                 <tr>
                   <th className="p-4">Institution</th>
                   <th className="p-4">Assessment ID</th>
                   <th className="p-4">Workflow status</th>
+                  <th className="p-4">Failure details</th>
                   <th className="p-4">Created</th>
                   <th className="p-4">Updated</th>
                 </tr>
@@ -1448,6 +1449,7 @@ const HistoryView = () => {
                     <td className="p-4 font-bold text-slate-800">{item.institution_name || 'Institution unavailable'}</td>
                     <td className="p-4 font-mono text-xs text-slate-600">{item.id}</td>
                     <td className="p-4 text-slate-700">{item.status || 'status unavailable'}</td>
+                    <td className="p-4 text-sm text-red-700">{item.failure_reason || '—'}</td>
                     <td className="p-4 text-slate-500">{item.created_at || 'not recorded'}</td>
                     <td className="p-4 text-slate-500">{item.updated_at || 'not recorded'}</td>
                   </tr>
