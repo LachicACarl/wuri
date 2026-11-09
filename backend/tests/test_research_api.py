@@ -516,6 +516,52 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(len(staged_files), 1)
         self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
 
+    def test_cleanup_pending_is_persisted_and_reconciled_with_retry(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=OSError("synthetic unlink failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["cleanup_pending"])
+
+        pending = self.database.pending_storage_cleanups(
+            self.database.user_by_username("research-admin")["id"]
+        )
+        self.assertEqual(len(pending), 1)
+        cleanup = pending[0]
+        self.assertTrue(cleanup["storage_key"].startswith(".wuri-delete-"))
+        self.assertTrue((self.storage.root / cleanup["storage_key"]).exists())
+
+        with patch.object(
+            main.storage, "delete_staged",
+            side_effect=OSError("synthetic cleanup retry failure"),
+        ):
+            failed = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(failed.status_code, 200, failed.text)
+        self.assertEqual(failed.json()["failed"], 1)
+        self.assertEqual(
+            self.database.pending_storage_cleanups(
+                self.database.user_by_username("research-admin")["id"]
+            )[0]["attempts"],
+            1,
+        )
+
+        retried = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(retried.status_code, 200, retried.text)
+        self.assertEqual(retried.json()["deleted"], 1)
+        self.assertEqual(retried.json()["remaining"], 0)
+        self.assertFalse((self.storage.root / cleanup["storage_key"]).exists())
+        with self.database.connection() as connection:
+            status = connection.execute(
+                "SELECT status, attempts FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup["id"],),
+            ).fetchone()
+        self.assertEqual(status["status"], "completed")
+        self.assertEqual(status["attempts"], 1)
+
     def _create_document_for_delete(self):
         user_id = self.database.user_by_username("research-admin")["id"]
         institution_id = self.database.institutions_for_user(user_id)[0]["id"]
