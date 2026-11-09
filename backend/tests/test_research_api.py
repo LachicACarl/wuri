@@ -472,6 +472,69 @@ class ResearchApiTests(unittest.TestCase):
                 connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
             )
 
+
+    def test_document_endpoints_deny_cross_institution_user(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+
+        outsider_id = self.database.ensure_admin(
+            "document-outsider", "synthetic outsider password long"
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                "DELETE FROM institution_memberships WHERE user_id = ?",
+                (outsider_id,),
+            )
+        self._act_as(outsider_id)
+
+        download = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(download.status_code, 404)
+
+        listing = self.client.get(
+            f"/api/institutions/{institution_id}/documents"
+        )
+        self.assertEqual(listing.status_code, 403)
+
+        deletion = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(deletion.status_code, 403)
+
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+
+    def test_viewer_cannot_change_document_verification_metadata(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+        viewer_id = self.database.ensure_admin(
+            "document-viewer", "synthetic viewer password long"
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                "INSERT INTO institution_memberships (user_id, institution_id, role, status) "
+                "VALUES (?, ?, 'viewer', 'active')",
+                (viewer_id, institution_id),
+            )
+        self._act_as(viewer_id)
+        response = self.client.patch(
+            f"/api/documents/{document_id}",
+            json={"review_status": "verified"},
+        )
+        self.assertEqual(response.status_code, 403)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT review_status FROM documents WHERE id = ?",
+                (document_id,),
+            ).fetchone()
+        self.assertNotEqual(row["review_status"], "verified")
+
     def test_document_delete_storage_stage_failure_keeps_database_record(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
