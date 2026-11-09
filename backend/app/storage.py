@@ -59,6 +59,14 @@ class PrivateStorage:
     def finalize_staged_delete(self, staged_key: str):
         self._path(staged_key).unlink(missing_ok=True)
 
+    def delete_staged(self, key: str):
+        """Delete only an object created by the staged-delete protocol."""
+        prefix = ".wuri-delete-"
+        suffix = key[len(prefix):] if isinstance(key, str) and key.startswith(prefix) else ""
+        if len(suffix) != 32 or any(c not in "0123456789abcdef" for c in suffix):
+            raise ValueError("Invalid staged storage key.")
+        self._path(key).unlink(missing_ok=True)
+
     def delete(self, key: str):
         self._path(key).unlink(missing_ok=True)
 
