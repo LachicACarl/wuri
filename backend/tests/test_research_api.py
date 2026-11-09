@@ -623,7 +623,7 @@ class ResearchApiTests(unittest.TestCase):
 
     def test_migration_010_integrates_after_migrations_001_through_009(self):
         from pathlib import Path
-        from app.migration_runner import apply_migration
+        from migration_runner import apply_migration
 
         migration_root = Path(__file__).resolve().parents[1] / "migrations"
         migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
