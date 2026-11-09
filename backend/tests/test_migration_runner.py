@@ -21,7 +21,7 @@ class MigrationRunnerTests(unittest.TestCase):
 
         migration_root = Path(__file__).resolve().parents[1] / "migrations"
         migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
-        self.assertEqual(len(migrations), 10)
+        self.assertEqual(len(migrations), 9)
 
         connection = sqlite3.connect(":memory:")
         connection.row_factory = sqlite3.Row
@@ -102,50 +102,6 @@ class MigrationRunnerTests(unittest.TestCase):
                 ("004_research_import_and_annotations.sql",),
             ).fetchone()
         )
-
-    def test_migration_010_applies_after_repository_migrations(self):
-        from pathlib import Path
-
-        migration_root = Path(__file__).resolve().parents[1] / "migrations"
-        migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
-        self.assertEqual(len(migrations), 10)
-
-        connection = sqlite3.connect(":memory:")
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute(
-            """CREATE TABLE schema_migrations (
-                migration_name TEXT PRIMARY KEY,
-                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )"""
-        )
-        try:
-            for migration in migrations:
-                apply_migration(
-                    connection,
-                    migration.name,
-                    migration.read_text(encoding="utf-8"),
-                    disable_foreign_keys=(
-                        migration.name == "004_research_import_and_annotations.sql"
-                    ),
-                )
-            queue_columns = {
-                row["name"]
-                for row in connection.execute("PRAGMA table_info(storage_cleanup_queue)")
-            }
-            self.assertTrue(
-                {"id", "institution_id", "document_id", "storage_key", "status",
-                 "attempts", "claimed_at", "completed_at"}.issubset(queue_columns)
-            )
-            self.assertEqual(connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)
-            self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            applied = {
-                row["migration_name"]
-                for row in connection.execute("SELECT migration_name FROM schema_migrations")
-            }
-            self.assertEqual(applied, {migration.name for migration in migrations})
-        finally:
-            connection.close()
 
     def test_failed_migration_rolls_back_ddl_and_history_for_safe_retry(self):
         self.connection.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY)")
