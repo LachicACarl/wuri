@@ -603,12 +603,9 @@ class Database:
             raise ValueError("Invalid staged storage key.")
         cleanup_id = _id("scq")
         with self.connection() as connection:
-            existing = connection.execute(
-                "SELECT id FROM storage_cleanup_queue WHERE storage_key = ?",
-                (storage_key,),
-            ).fetchone()
-            if existing:
-                cleanup_id = existing["id"]
+            # Authorize before checking whether the storage key already exists.
+            # Otherwise callers could probe the canonical queue ID for another
+            # institution's staged object using a guessed quarantine key.
             membership = connection.execute(
                 """SELECT role FROM institution_memberships
                    WHERE user_id = ? AND institution_id = ? AND status = 'active'""",
@@ -616,6 +613,13 @@ class Database:
             ).fetchone()
             if not membership or membership["role"] != "administrator":
                 raise PermissionError("Administrator document access is required.")
+            existing = connection.execute(
+                """SELECT id FROM storage_cleanup_queue
+                   WHERE storage_key = ? AND institution_id = ?""",
+                (storage_key, institution_id),
+            ).fetchone()
+            if existing:
+                cleanup_id = existing["id"]
             connection.execute(
                 """INSERT INTO storage_cleanup_queue
                    (id, institution_id, document_id, storage_key, reason, status)
