@@ -560,38 +560,33 @@ class ResearchApiTests(unittest.TestCase):
     def test_concurrent_document_delete_is_serialized_and_idempotently_denied(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
+        token = self.client.cookies.get(main.SESSION_COOKIE)
         entered_stage = threading.Event()
         release_stage = threading.Event()
         original_stage = self.storage.stage_delete
+        results = []
+        errors = []
 
         def blocking_stage(key):
             entered_stage.set()
-            self.assertTrue(release_stage.wait(timeout=5))
+            if not release_stage.wait(timeout=5):
+                raise TimeoutError("Concurrent deletion test did not release stage.")
             return original_stage(key)
 
-        results = {}
-        errors = []
-
-        token = self.client.cookies.get(main.SESSION_COOKIE)
-
-        def invoke_delete(name):
+        def invoke_delete():
             try:
-                result = main.delete_document(document_id, token)
-                results[name] = {
-                    "status_code": result.status_code,
-                    "deleted": json.loads(result.body).get("deleted", False),
-                }
+                results.append(main.delete_document(document_id, token))
             except HTTPException as error:
-                if error.status_code == 403:
-                    results[name] = {"deleted": False, "status_code": 403}
-                else:
-                    errors.append((type(error).__name__, str(error)))
+                results.append({"status_code": error.status_code, "deleted": False})
             except BaseException as error:
                 errors.append((type(error).__name__, str(error)))
 
+        # Start the first route call while staging is paused, then start the
+        # second. The per-document lock must keep the second from staging until
+        # the first has committed deletion and finalized the staged object.
         with patch.object(self.storage, "stage_delete", side_effect=blocking_stage):
-            first = threading.Thread(target=invoke_delete, args=("first",))
-            second = threading.Thread(target=invoke_delete, args=("second",))
+            first = threading.Thread(target=invoke_delete)
+            second = threading.Thread(target=invoke_delete)
             first.start()
             self.assertTrue(entered_stage.wait(timeout=5))
             second.start()
@@ -602,12 +597,13 @@ class ResearchApiTests(unittest.TestCase):
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
         self.assertEqual(len(results), 2, f"results={results!r}, errors={errors!r}")
-        self.assertEqual(
-            sorted(value["status_code"] for value in results.values()),
-            [200, 403],
-            f"unexpected concurrent delete outcomes: {results!r}",
-        )
-        self.assertEqual(sum(1 for value in results.values() if value.get("deleted")), 1)
+        normalized = [
+            {"status_code": value.status_code, "deleted": json.loads(value.body).get("deleted", False)}
+            if isinstance(value, Response) else value
+            for value in results
+        ]
+        self.assertEqual(sorted(value["status_code"] for value in normalized), [200, 403])
+        self.assertEqual(sum(1 for value in normalized if value.get("deleted")), 1)
         self.assertEqual(errors, [])
         self.assertFalse((self.storage.root / storage_key).exists())
         with self.database.connection() as connection:
