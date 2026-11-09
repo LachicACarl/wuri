@@ -90,7 +90,7 @@ class MigrationRunnerTests(unittest.TestCase):
         apply_migration(
             self.connection,
             "004_research_import_and_annotations.sql",
-            "CREATE TABLE temporary_rebuild (id TEXT);\\n",
+            "CREATE TABLE temporary_rebuild (id TEXT);\n",
             disable_foreign_keys=True,
         )
         self.assertEqual(
