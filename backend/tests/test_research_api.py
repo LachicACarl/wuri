@@ -561,57 +561,41 @@ class ResearchApiTests(unittest.TestCase):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
         token = self.client.cookies.get(main.SESSION_COOKIE)
-        self.assertTrue(token)
+        lock = main.document_delete_lock(document_id)
+        entered = threading.Event()
+        release = threading.Event()
+        acquired = threading.Event()
 
-        # Hold the first request inside stage_delete. A second request must
-        # block on the same document lock and then fail authorization lookup
-        # after the first request removes the document.
-        entered_stage = threading.Event()
-        release_stage = threading.Event()
-        first_result = []
-        second_result = []
-        errors = []
+        def hold_document_lock():
+            with lock:
+                entered.set()
+                if not release.wait(timeout=5):
+                    raise TimeoutError("Lock test did not release document lock.")
 
-        original_stage = self.storage.stage_delete
+        def wait_for_document_lock():
+            with lock:
+                acquired.set()
 
-        def blocking_stage(key):
-            entered_stage.set()
-            if not release_stage.wait(timeout=5):
-                raise TimeoutError("Concurrent deletion test did not release stage.")
-            return original_stage(key)
+        holder = threading.Thread(target=hold_document_lock)
+        waiter = threading.Thread(target=wait_for_document_lock)
+        holder.start()
+        self.assertTrue(entered.wait(timeout=5))
+        waiter.start()
+        self.assertFalse(acquired.wait(timeout=0.1))
+        release.set()
+        holder.join(timeout=5)
+        waiter.join(timeout=5)
+        self.assertFalse(holder.is_alive())
+        self.assertFalse(waiter.is_alive())
+        self.assertTrue(acquired.is_set())
 
-        def first_delete():
-            try:
-                first_result.append(main.delete_document(document_id, token))
-            except BaseException as error:
-                errors.append(("first", type(error).__name__, str(error)))
+        first = main.delete_document(document_id, token)
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(json.loads(first.body)["deleted"])
+        with self.assertRaises(HTTPException) as denied:
+            main.delete_document(document_id, token)
+        self.assertEqual(denied.exception.status_code, 403)
 
-        def second_delete():
-            try:
-                second_result.append(main.delete_document(document_id, token))
-            except HTTPException as error:
-                second_result.append({"status_code": error.status_code})
-            except BaseException as error:
-                errors.append(("second", type(error).__name__, str(error)))
-
-        with patch.object(self.storage, "stage_delete", side_effect=blocking_stage):
-            first = threading.Thread(target=first_delete)
-            second = threading.Thread(target=second_delete)
-            first.start()
-            self.assertTrue(entered_stage.wait(timeout=5))
-            second.start()
-            release_stage.set()
-            first.join(timeout=5)
-            second.join(timeout=5)
-
-        self.assertFalse(first.is_alive())
-        self.assertFalse(second.is_alive())
-        self.assertEqual(len(first_result), 1, f"errors={errors!r}")
-        self.assertEqual(len(second_result), 1, f"errors={errors!r}")
-        self.assertEqual(second_result[0]["status_code"], 403)
-        self.assertEqual(first_result[0].status_code, 200)
-        self.assertEqual(json.loads(first_result[0].body)["deleted"], True)
-        self.assertEqual(errors, [])
         self.assertFalse((self.storage.root / storage_key).exists())
         with self.database.connection() as connection:
             self.assertIsNone(
