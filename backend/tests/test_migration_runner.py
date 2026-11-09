@@ -15,6 +15,46 @@ class MigrationRunnerTests(unittest.TestCase):
     def tearDown(self):
         self.connection.close()
 
+
+    def test_all_repository_migrations_apply_in_order(self):
+        from pathlib import Path
+
+        migration_root = Path(__file__).resolve().parents[1] / "migrations"
+        migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
+        self.assertEqual(len(migrations), 9)
+
+        connection = sqlite3.connect(":memory:")
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute(
+            """CREATE TABLE schema_migrations (
+                migration_name TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        try:
+            for migration in migrations:
+                apply_migration(
+                    connection,
+                    migration.name,
+                    migration.read_text(encoding="utf-8"),
+                    disable_foreign_keys=(
+                        migration.name == "004_research_import_and_annotations.sql"
+                    ),
+                )
+
+            applied = [
+                row["migration_name"]
+                for row in connection.execute(
+                    "SELECT migration_name FROM schema_migrations ORDER BY migration_name"
+                )
+            ]
+            self.assertEqual(applied, [migration.name for migration in migrations])
+            self.assertEqual(connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+            self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+        finally:
+            connection.close()
+
     def test_failed_migration_rolls_back_ddl_and_history_for_safe_retry(self):
         self.connection.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY)")
         with self.assertRaises(sqlite3.OperationalError):
