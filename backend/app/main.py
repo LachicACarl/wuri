@@ -864,12 +864,17 @@ def reconcile_storage_cleanup(
             storage.delete_staged(item["storage_key"])
             database.complete_storage_cleanup(user["id"], item["id"])
             deleted += 1
-        except OSError as error:
+        except Exception as error:
             failed += 1
-            database.record_storage_cleanup_failure(
-                user["id"], item["id"],
-                "Staged object cleanup failed: " + type(error).__name__,
-            )
+            try:
+                database.record_storage_cleanup_failure(
+                    user["id"], item["id"],
+                    "Staged object cleanup failed: " + type(error).__name__,
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Unable to release or record failed cleanup lease %s.", item["id"],
+                )
             logging.getLogger(__name__).exception(
                 "Staged storage cleanup %s failed.", item["id"],
             )
