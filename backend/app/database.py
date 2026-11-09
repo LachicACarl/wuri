@@ -603,6 +603,12 @@ class Database:
             raise ValueError("Invalid staged storage key.")
         cleanup_id = _id("scq")
         with self.connection() as connection:
+            existing = connection.execute(
+                "SELECT id FROM storage_cleanup_queue WHERE storage_key = ?",
+                (storage_key,),
+            ).fetchone()
+            if existing:
+                cleanup_id = existing["id"]
             membership = connection.execute(
                 """SELECT role FROM institution_memberships
                    WHERE user_id = ? AND institution_id = ? AND status = 'active'""",
