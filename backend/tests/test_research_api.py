@@ -716,9 +716,9 @@ class ResearchApiTests(unittest.TestCase):
         other_institution_id = "institution-not-owned-by-admin"
         with self.database.connection() as connection:
             connection.execute(
-                """INSERT INTO institutions (id, name, code, status)
-                   VALUES (?, ?, ?, 'active')""",
-                (other_institution_id, "Other institution", "OTHER-ISO"),
+                """INSERT INTO institutions (id, name, status)
+                   VALUES (?, ?, 'active')""",
+                (other_institution_id, "Other institution"),
             )
             connection.execute(
                 """INSERT INTO institution_memberships
@@ -755,7 +755,7 @@ class ResearchApiTests(unittest.TestCase):
             ).fetchone()
             institution_id = membership["institution_id"]
             connection.execute(
-                """UPDATE institution_memberships SET role = 'researcher'
+                """UPDATE institution_memberships SET role = 'viewer'
                    WHERE user_id = (
                      SELECT id FROM users WHERE username = 'research-admin'
                    ) AND institution_id = ?""",
