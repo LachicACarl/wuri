@@ -5,10 +5,11 @@ CREATE TABLE IF NOT EXISTS storage_cleanup_queue (
     storage_key TEXT NOT NULL UNIQUE,
     reason TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'completed')),
+        CHECK (status IN ('pending', 'processing', 'completed')),
     attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    claimed_at TEXT,
     completed_at TEXT
 );
 
