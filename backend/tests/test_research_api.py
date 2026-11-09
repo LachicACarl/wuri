@@ -721,8 +721,8 @@ class ResearchApiTests(unittest.TestCase):
                 (other_institution_id, "Other institution"),
             )
             connection.execute(
-                """INSERT INTO users (id, username, password_hash, is_active)
-                   VALUES (?, ?, ?, 1)""",
+                """INSERT INTO users (id, username, password_hash, status)
+                   VALUES (?, ?, ?, 'active')""",
                 ("other-admin-user", "other-admin-user", "synthetic-password-hash"),
             )
             connection.execute(
