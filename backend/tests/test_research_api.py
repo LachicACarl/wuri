@@ -722,9 +722,9 @@ class ResearchApiTests(unittest.TestCase):
             )
             connection.execute(
                 """INSERT INTO institution_memberships
-                   (id, institution_id, user_id, role, status)
-                   VALUES (?, ?, ?, 'administrator', 'active')""",
-                ("membership-other", other_institution_id, "other-admin-user"),
+                   (institution_id, user_id, role, status)
+                   VALUES (?, ?, 'administrator', 'active')""",
+                (other_institution_id, "other-admin-user"),
             )
 
         foreign_cleanup = self.database.enqueue_storage_cleanup(
