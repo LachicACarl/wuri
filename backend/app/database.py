@@ -2231,6 +2231,14 @@ def _canonical_relevance_label(value: Any) -> str:
     raise ValueError("Annotation reviews require a supported binary relevance label.")
 
 
+def _is_staged_storage_key(value: str) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == len(".wuri-delete-") + 32
+        and value.startswith(".wuri-delete-")
+        and all(character in "0123456789abcdef" for character in value[len(".wuri-delete-"):])
+    )
+
 def _id(prefix: str) -> str:
     import uuid
     return f"{prefix}_{uuid.uuid4()}"
