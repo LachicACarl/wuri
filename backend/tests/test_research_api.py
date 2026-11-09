@@ -516,7 +516,7 @@ class ResearchApiTests(unittest.TestCase):
         institution_id = self.database.institutions_for_user(user_id)[0]["id"]
         with self.database.connection() as connection:
             connection.execute(
-                """UPDATE institution_memberships SET status = 'inactive'
+                """UPDATE institution_memberships SET status = 'disabled'
                    WHERE user_id = ? AND institution_id = ?""",
                 (user_id, institution_id),
             )
@@ -545,7 +545,7 @@ class ResearchApiTests(unittest.TestCase):
         self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
         with self.database.connection() as connection:
             connection.execute(
-                """UPDATE institution_memberships SET status = 'inactive'
+                """UPDATE institution_memberships SET status = 'disabled'
                    WHERE user_id = ? AND institution_id = ?""",
                 (user_id, institution_id),
             )
@@ -593,8 +593,10 @@ class ResearchApiTests(unittest.TestCase):
 
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
-        self.assertEqual(len(results), 1)
-        self.assertEqual(errors, [403])
+        self.assertEqual(len(results), 2)
+        self.assertEqual(sum(1 for value in results.values()
+                             if isinstance(value, dict) and value.get("deleted")), 1)
+        self.assertEqual(errors, [])
         self.assertFalse((self.storage.root / storage_key).exists())
         with self.database.connection() as connection:
             self.assertIsNone(
