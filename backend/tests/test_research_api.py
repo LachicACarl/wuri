@@ -563,6 +563,46 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(status["attempts"], 1)
 
 
+
+    def test_document_delete_unexpected_finalize_error_is_queued(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=RuntimeError("synthetic unexpected finalize failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["cleanup_pending"])
+        user_id = self.database.user_by_username("research-admin")["id"]
+        pending = self.database.pending_storage_cleanups(user_id)
+        self.assertEqual(len(pending), 1)
+        self.assertIn("RuntimeError", pending[0]["reason"])
+        self.assertTrue((self.storage.root / pending[0]["storage_key"]).exists())
+
+    def test_document_delete_reports_manual_recovery_when_queue_write_fails(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=RuntimeError("synthetic finalize failure"),
+        ), patch.object(
+            main.database, "enqueue_storage_cleanup",
+            side_effect=sqlite3.OperationalError("synthetic queue database failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("manual recovery", response.json()["detail"])
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+        staged_files = list(self.storage.root.glob(".wuri-delete-*"))
+        self.assertEqual(len(staged_files), 1)
+        self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
+
     def test_cleanup_claim_is_exclusive_and_stale_lease_can_be_reclaimed(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
