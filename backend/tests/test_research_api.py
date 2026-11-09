@@ -637,6 +637,76 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(status["status"], "completed")
         self.assertIsNone(status["claimed_at"])
 
+
+    def test_cleanup_retries_when_completion_write_fails_after_file_delete(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "c" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key,
+            "synthetic completion failure",
+        )
+        staged_path = self.storage.root / staged_key
+        staged_path.write_bytes(b"synthetic staged object")
+
+        with patch.object(
+            self.database, "complete_storage_cleanup",
+            side_effect=sqlite3.OperationalError("synthetic completion write failure"),
+        ):
+            response = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["failed"], 1)
+        self.assertFalse(staged_path.exists())
+
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET claimed_at = datetime('now', '-6 minutes')
+                   WHERE id = ?""",
+                (cleanup_id,),
+            )
+        retried = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(retried.status_code, 200, retried.text)
+        self.assertEqual(retried.json()["deleted"], 1)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT status, attempts, claimed_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup_id,),
+            ).fetchone()
+        self.assertEqual(row["status"], "completed")
+        self.assertIsNone(row["claimed_at"])
+
+    def test_cleanup_enqueue_is_idempotent_for_same_staged_key(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "d" * 32
+        first_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "first reason",
+        )
+        second_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "second reason",
+        )
+        with self.database.connection() as connection:
+            rows = connection.execute(
+                "SELECT id, reason, status FROM storage_cleanup_queue WHERE storage_key = ?",
+                (staged_key,),
+            ).fetchall()
+            events = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.storage_cleanup_pending'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["reason"], "second reason")
+        self.assertEqual(rows[0]["status"], "pending")
+        self.assertEqual(first_id, second_id)
+        self.assertEqual(events, 2)
+
     def test_cleanup_claim_and_completion_require_current_admin_membership(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
