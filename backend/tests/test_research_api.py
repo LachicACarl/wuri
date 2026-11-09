@@ -273,6 +273,55 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "The document could not be persisted.")
         self.assertEqual(list(self.storage.root.iterdir()), [])
 
+        user_id = self.database.user_by_username("research-admin")["id"]
+        records = self.database.assessments(user_id)
+        self.assertEqual(len(records), 1)
+        assessment = records[0]
+        self.assertEqual(assessment["status"], "failed")
+        self.assertEqual(
+            assessment["failure_reason"],
+            "Document processing or persistence failed.",
+        )
+        detail = self.client.get(f"/api/assessments/{assessment['id']}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(
+            detail.json()["assessment"]["failure_reason"],
+            "Document processing or persistence failed.",
+        )
+
+    def test_upload_failure_on_existing_assessment_preserves_workflow_status(self):
+        self.login()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        assessment_id = self.database.create_assessment(
+            user_id, institution_id, "evidence_extracted"
+        )
+
+        class Scanner:
+            def scan(self, path):
+                return type("Result", (), {"status": "clean", "scanner": "synthetic-test"})()
+
+        with patch.object(main, "malware_scanner", Scanner()), patch.object(
+            main.database, "persist_document", side_effect=RuntimeError("synthetic database failure")
+        ):
+            response = self.client.post(
+                "/api/upload",
+                params={"assessment_id": assessment_id, "institution_id": institution_id},
+                files={"file": ("sample.txt", b"synthetic content", "text/plain")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        detail = self.client.get(f"/api/assessments/{assessment_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["assessment"]["status"], "evidence_extracted")
+        with self.database.connection() as connection:
+            event = connection.execute(
+                """SELECT event_type FROM audit_events
+                   WHERE assessment_id = ? AND event_type = 'document.upload_failed'""",
+                (assessment_id,),
+            ).fetchone()
+        self.assertIsNotNone(event)
+
     def test_upload_requires_clean_scan_before_extraction(self):
         self.login()
         user_id = self.database.user_by_username("research-admin")["id"]
@@ -421,6 +470,78 @@ class ResearchApiTests(unittest.TestCase):
             self.assertIsNone(
                 connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
             )
+
+    def test_document_delete_storage_stage_failure_keeps_database_record(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "stage_delete", side_effect=OSError("synthetic storage failure")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 503)
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+
+    def test_document_delete_database_failure_restores_staged_file(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.database, "delete_document", side_effect=PermissionError("synthetic database denial")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+
+    def test_document_delete_reports_quarantined_file_cleanup(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete", side_effect=OSError("synthetic unlink failure")
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["cleanup_pending"])
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
+            )
+        staged_files = list(self.storage.root.glob(".wuri-delete-*"))
+        self.assertEqual(len(staged_files), 1)
+        self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
+
+    def _create_document_for_delete(self):
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        assessment_id = self.database.create_assessment(
+            user_id, institution_id, "document_extracted"
+        )
+        payload = b"synthetic delete fixture"
+        storage_key, checksum = self.storage.save(payload, ".txt")
+        document_id = str(main.uuid4())
+        self.database.persist_document(
+            user_id,
+            institution_id,
+            assessment_id,
+            {
+                "document_id": document_id,
+                "filename": "delete-me.txt",
+                "file_type": "txt",
+                "file_size": len(payload),
+                "checksum": checksum,
+                "storage_key": storage_key,
+                "extraction_status": "success",
+            },
+            [],
+            [],
+        )
+        return document_id, storage_key, assessment_id
 
     def _act_as(self, user_id):
         secret = os.environ["WURI_SESSION_SECRET"]

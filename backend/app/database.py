@@ -341,6 +341,40 @@ class Database:
             _event(connection, institution_id, assessment_id, user_id, "assessment.created", {})
         return assessment_id
 
+    def record_upload_failure(
+        self,
+        user_id: str,
+        institution_id: str,
+        assessment_id: str,
+        reason: str,
+        *,
+        fail_assessment: bool,
+    ):
+        """Preserve an auditable upload failure without deleting its assessment."""
+        with self.connection() as connection:
+            if not _assessment_access(connection, user_id, institution_id, assessment_id):
+                raise PermissionError("Assessment access denied.")
+            if fail_assessment:
+                updated = connection.execute(
+                    """UPDATE assessments
+                       SET status = 'failed', failure_reason = ?, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ? AND institution_id = ? AND created_by = ?""",
+                    (reason, assessment_id, institution_id, user_id),
+                )
+                if updated.rowcount != 1:
+                    raise PermissionError("Assessment failure update is not permitted.")
+                event_type = "assessment.failed"
+            else:
+                event_type = "document.upload_failed"
+            _event(
+                connection,
+                institution_id,
+                assessment_id,
+                user_id,
+                event_type,
+                {"reason": reason},
+            )
+
     def persist_document(self, user_id: str, institution_id: str, assessment_id: str, document: dict, passages: list[dict], matches: list[dict]):
         document_id = document["document_id"]
         with self.connection() as connection:
@@ -403,7 +437,7 @@ class Database:
     def assessments(self, user_id: str):
         with self.connection() as connection:
             return connection.execute(
-                """SELECT a.id, a.institution_id, i.name AS institution_name, a.status, a.created_at, a.updated_at
+                """SELECT a.id, a.institution_id, i.name AS institution_name, a.status, a.failure_reason, a.created_at, a.updated_at
                    FROM assessments a JOIN institutions i ON i.id = a.institution_id
                    WHERE EXISTS (SELECT 1 FROM institution_memberships m WHERE m.institution_id = a.institution_id AND m.user_id = ? AND m.status = 'active')
                    ORDER BY a.created_at DESC""",
@@ -414,7 +448,7 @@ class Database:
         with self.connection() as connection:
             row = connection.execute(
                 """SELECT a.id, a.institution_id, i.name AS institution_name, a.status,
-                          a.created_at, a.updated_at
+                          a.failure_reason, a.created_at, a.updated_at
                    FROM assessments a JOIN institutions i ON i.id = a.institution_id
                    WHERE a.id = ? AND EXISTS (
                        SELECT 1 FROM institution_memberships m
@@ -501,6 +535,32 @@ class Database:
             )
             _event(connection, row["institution_id"], None, user_id, "document.metadata.updated",
                    {"document_id": document_id, "fields": sorted(values)})
+
+    def document_storage_key_for_deletion(self, user_id: str, document_id: str) -> str:
+        """Authorize deletion and return the private storage key without mutating data."""
+        with self.connection() as connection:
+            row = connection.execute(
+                """SELECT d.storage_key, m.role
+                   FROM documents d JOIN institution_memberships m
+                     ON m.institution_id = d.institution_id
+                   WHERE d.id = ? AND m.user_id = ? AND m.status = 'active'""",
+                (document_id, user_id),
+            ).fetchone()
+            if not row or row["role"] != "administrator":
+                raise PermissionError("Administrator document access is required.")
+            approved_reference = connection.execute(
+                """SELECT 1
+                   FROM research_examples e
+                   JOIN research_datasets d ON d.id = e.dataset_id
+                   WHERE e.source_document_id = ? AND d.verification_status = 'approved'
+                   LIMIT 1""",
+                (document_id,),
+            ).fetchone()
+            if approved_reference:
+                raise ValueError(
+                    "A document referenced by an approved research dataset cannot be deleted."
+                )
+            return row["storage_key"]
 
     def delete_document(self, user_id: str, document_id: str) -> str:
         with self.connection() as connection:
