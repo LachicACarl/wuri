@@ -620,6 +620,47 @@ class ResearchApiTests(unittest.TestCase):
                 user_id, cleanup_id, "synthetic failure"
             )
 
+
+    def test_migration_010_integrates_after_migrations_001_through_009(self):
+        from pathlib import Path
+        from app.migration_runner import apply_migration
+
+        migration_root = Path(__file__).resolve().parents[1] / "migrations"
+        migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
+        self.assertEqual(len(migrations), 10)
+        connection = sqlite3.connect(":memory:")
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute(
+            """CREATE TABLE schema_migrations (
+                migration_name TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        try:
+            for migration in migrations:
+                apply_migration(
+                    connection, migration.name,
+                    migration.read_text(encoding="utf-8"),
+                    disable_foreign_keys=(
+                        migration.name == "004_research_import_and_annotations.sql"
+                    ),
+                )
+            self.assertEqual(
+                connection.execute("PRAGMA foreign_key_check").fetchall(), []
+            )
+            self.assertEqual(
+                connection.execute("PRAGMA foreign_keys").fetchone()[0], 1
+            )
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' "
+                    "AND name='storage_cleanup_queue'"
+                ).fetchone()
+            )
+        finally:
+            connection.close()
+
     def _create_document_for_delete(self):
         user_id = self.database.user_by_username("research-admin")["id"]
         institution_id = self.database.institutions_for_user(user_id)[0]["id"]
