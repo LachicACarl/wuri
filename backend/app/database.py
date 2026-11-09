@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from .migration_runner import apply_migration
+
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "wuri.sqlite3"
 
@@ -47,17 +49,11 @@ class Database:
                     (migration.name,),
                 ).fetchone():
                     continue
-                connection.executescript(migration.read_text(encoding="utf-8"))
-                foreign_key_violations = connection.execute(
-                    "PRAGMA foreign_key_check"
-                ).fetchall()
-                if foreign_key_violations:
-                    raise sqlite3.IntegrityError(
-                        f"Migration {migration.name} caused foreign-key violations."
-                    )
-                connection.execute(
-                    "INSERT INTO schema_migrations (migration_name) VALUES (?)",
-                    (migration.name,),
+                apply_migration(
+                    connection,
+                    migration.name,
+                    migration.read_text(encoding="utf-8"),
+                    disable_foreign_keys=(migration.name == "004_research_import_and_annotations.sql"),
                 )
 
     def ensure_admin(self, username: str, password_hash: str):
