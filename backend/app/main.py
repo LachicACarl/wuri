@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import math
 import sqlite3
 import hashlib
@@ -654,11 +655,20 @@ async def upload_document(
         )
     except Exception as error:
         _delete_temporary_upload(storage_key)
-        if created_assessment and assessment_id:
+        if assessment_id:
             try:
-                database.remove_empty_assessment(user["id"], assessment_id)
+                database.record_upload_failure(
+                    user["id"],
+                    institution_id,
+                    assessment_id,
+                    "Document processing or persistence failed.",
+                    fail_assessment=created_assessment,
+                )
             except Exception:
-                pass
+                logging.getLogger(__name__).exception(
+                    "Unable to record upload failure for assessment %s.",
+                    assessment_id,
+                )
         raise HTTPException(
             status_code=500, detail="The document could not be persisted."
         ) from error
