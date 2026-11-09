@@ -596,6 +596,95 @@ class Database:
                    {"document_id": document_id})
             return row["storage_key"]
 
+    def enqueue_storage_cleanup(
+        self, user_id: str, institution_id: str, document_id: str,
+        storage_key: str, reason: str,
+    ) -> str:
+        """Persist a quarantined object so cleanup survives process restarts."""
+        if not _is_staged_storage_key(storage_key):
+            raise ValueError("Invalid staged storage key.")
+        cleanup_id = _id("scq")
+        with self.connection() as connection:
+            membership = connection.execute(
+                """SELECT role FROM institution_memberships
+                   WHERE user_id = ? AND institution_id = ? AND status = 'active'""",
+                (user_id, institution_id),
+            ).fetchone()
+            if not membership or membership["role"] != "administrator":
+                raise PermissionError("Administrator document access is required.")
+            connection.execute(
+                """INSERT INTO storage_cleanup_queue
+                   (id, institution_id, document_id, storage_key, reason, status)
+                   VALUES (?, ?, ?, ?, ?, 'pending')
+                   ON CONFLICT(storage_key) DO UPDATE SET
+                     reason = excluded.reason,
+                     status = 'pending',
+                     updated_at = CURRENT_TIMESTAMP,
+                     completed_at = NULL""",
+                (cleanup_id, institution_id, document_id, storage_key, reason[:500]),
+            )
+            _event(
+                connection, institution_id, None, user_id,
+                "document.storage_cleanup_pending",
+                {"document_id": document_id, "cleanup_id": cleanup_id},
+            )
+        return cleanup_id
+
+    def pending_storage_cleanups(
+        self, user_id: str, limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                """SELECT q.id, q.institution_id, q.document_id, q.storage_key,
+                          q.reason, q.attempts, q.created_at, q.updated_at
+                   FROM storage_cleanup_queue q
+                   JOIN institution_memberships m
+                     ON m.institution_id = q.institution_id
+                   WHERE m.user_id = ? AND m.status = 'active'
+                     AND m.role = 'administrator' AND q.status = 'pending'
+                   ORDER BY q.created_at ASC LIMIT ?""",
+                (user_id, max(1, min(int(limit), 100))),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def record_storage_cleanup_failure(
+        self, user_id: str, cleanup_id: str, safe_reason: str,
+    ) -> None:
+        with self.connection() as connection:
+            cursor = connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET attempts = attempts + 1, reason = ?,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ? AND status = 'pending'
+                     AND EXISTS (
+                       SELECT 1 FROM institution_memberships m
+                       WHERE m.user_id = ? AND m.institution_id =
+                             storage_cleanup_queue.institution_id
+                         AND m.status = 'active' AND m.role = 'administrator'
+                     )""",
+                (safe_reason[:500], cleanup_id, user_id),
+            )
+            if cursor.rowcount != 1:
+                raise PermissionError("Administrator document access is required.")
+
+    def complete_storage_cleanup(self, user_id: str, cleanup_id: str) -> None:
+        with self.connection() as connection:
+            cursor = connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ? AND status = 'pending'
+                     AND EXISTS (
+                       SELECT 1 FROM institution_memberships m
+                       WHERE m.user_id = ? AND m.institution_id =
+                             storage_cleanup_queue.institution_id
+                         AND m.status = 'active' AND m.role = 'administrator'
+                     )""",
+                (cleanup_id, user_id),
+            )
+            if cursor.rowcount != 1:
+                raise PermissionError("Administrator document access is required.")
+
     def remove_empty_assessment(self, user_id: str, assessment_id: str):
         with self.connection() as connection:
             connection.execute(
@@ -2112,6 +2201,15 @@ def _canonical_relevance_label(value: Any) -> str:
     if normalized in {"false", "0", "no", "negative", "not_relevant"}:
         return "false"
     raise ValueError("Annotation reviews require a supported binary relevance label.")
+
+
+def _is_staged_storage_key(value: str) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == len(".wuri-delete-") + 32
+        and value.startswith(".wuri-delete-")
+        and all(character in "0123456789abcdef" for character in value[len(".wuri-delete-"):])
+    )
 
 
 def _id(prefix: str) -> str:
