@@ -1,4 +1,5 @@
 import os
+import threading
 import sqlite3
 import csv
 import io
@@ -835,6 +836,89 @@ class ResearchApiTests(unittest.TestCase):
                 user_id, institution_id, document_id,
                 ".wuri-delete-" + "f" * 32, "non-admin rejection",
             )
+
+
+    def test_cleanup_claim_is_atomic_across_independent_database_instances(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "9" * 32, "synthetic concurrent claim",
+        )
+        from app.database import Database
+        second_database = Database(self.database.path)
+        barrier = threading.Barrier(2)
+        results = []
+        errors = []
+
+        def claim(database_instance):
+            try:
+                barrier.wait(timeout=5)
+                results.append(
+                    database_instance.claim_storage_cleanup(user_id, cleanup_id)
+                )
+            except Exception as error:
+                errors.append(error)
+
+        first = threading.Thread(target=claim, args=(self.database,))
+        second = threading.Thread(target=claim, args=(second_database,))
+        first.start()
+        second.start()
+        first.join(timeout=10)
+        second.join(timeout=10)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(sorted(results), [False, True])
+
+    def test_cleanup_enqueue_does_not_reveal_existing_id_without_membership(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "8" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "owned queue row",
+        )
+        outsider_id = self.database.ensure_admin(
+            "queue-probe-outsider", "synthetic outsider password long",
+        )
+        with self.assertRaises(PermissionError):
+            self.database.enqueue_storage_cleanup(
+                outsider_id, institution_id, document_id, staged_key,
+                "unauthorized idempotency probe",
+            )
+        self.assertTrue(cleanup_id)
+
+    def test_viewer_cannot_change_document_verification_metadata(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+        viewer_id = self.database.ensure_admin(
+            "document-viewer", "synthetic viewer password long",
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """INSERT INTO institution_memberships
+                   (user_id, institution_id, role, status)
+                   VALUES (?, ?, 'viewer', 'active')""",
+                (viewer_id, institution_id),
+            )
+        self._act_as(viewer_id)
+        response = self.client.patch(
+            f"/api/documents/{document_id}",
+            json={"review_status": "verified"},
+        )
+        self.assertEqual(response.status_code, 403)
+        with self.database.connection() as connection:
+            record = connection.execute(
+                "SELECT review_status FROM documents WHERE id = ?",
+                (document_id,),
+            ).fetchone()
+        self.assertNotEqual(record["review_status"], "verified")
 
     def test_cleanup_claim_and_completion_require_current_admin_membership(self):
         self.login()
