@@ -509,6 +509,107 @@ class ResearchApiTests(unittest.TestCase):
             )
         self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
 
+    def test_revoked_membership_blocks_document_download(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships SET status = 'inactive'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+
+        response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            downloads = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.downloaded'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(downloads, 0)
+
+    def test_revoked_membership_cannot_complete_claimed_cleanup(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "e" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "synthetic revocation test",
+        )
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships SET status = 'inactive'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT status FROM storage_cleanup_queue WHERE id = ?", (cleanup_id,)
+            ).fetchone()
+        self.assertEqual(row["status"], "processing")
+
+    def test_concurrent_document_delete_is_serialized_and_idempotently_denied(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        entered_stage = threading.Event()
+        release_stage = threading.Event()
+        original_stage = self.storage.stage_delete
+
+        def blocking_stage(key):
+            entered_stage.set()
+            self.assertTrue(release_stage.wait(timeout=5))
+            return original_stage(key)
+
+        results = {}
+        errors = []
+
+        def invoke_delete(name):
+            try:
+                results[name] = main.delete_document(
+                    document_id,
+                    self.client.cookies.get(main.SESSION_COOKIE),
+                )
+            except HTTPException as error:
+                errors.append(error.status_code)
+
+        with patch.object(self.storage, "stage_delete", side_effect=blocking_stage):
+            first = threading.Thread(target=invoke_delete, args=("first",))
+            second = threading.Thread(target=invoke_delete, args=("second",))
+            first.start()
+            self.assertTrue(entered_stage.wait(timeout=5))
+            second.start()
+            release_stage.set()
+            first.join(timeout=5)
+            second.join(timeout=5)
+
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(len(results), 1)
+        self.assertEqual(errors, [403])
+        self.assertFalse((self.storage.root / storage_key).exists())
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+            deleted_events = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.deleted'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(deleted_events, 1)
+
     def test_viewer_cannot_change_document_verification_metadata(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
