@@ -814,7 +814,7 @@ def delete_document(
         if staged_key:
             try:
                 storage.finalize_staged_delete(staged_key)
-            except OSError as cleanup_error:
+            except Exception as cleanup_error:
                 logging.getLogger(__name__).exception(
                     "Document %s was removed from the database but its staged file needs cleanup.",
                     document_id,
