@@ -536,11 +536,13 @@ class Database:
             _event(connection, row["institution_id"], None, user_id, "document.metadata.updated",
                    {"document_id": document_id, "fields": sorted(values)})
 
-    def document_storage_key_for_deletion(self, user_id: str, document_id: str) -> str:
-        """Authorize deletion and return the private storage key without mutating data."""
+    def document_storage_key_for_deletion(
+        self, user_id: str, document_id: str,
+    ) -> tuple[str, str]:
+        """Authorize deletion and return storage key and institution without mutation."""
         with self.connection() as connection:
             row = connection.execute(
-                """SELECT d.storage_key, m.role
+                """SELECT d.storage_key, d.institution_id, m.role
                    FROM documents d JOIN institution_memberships m
                      ON m.institution_id = d.institution_id
                    WHERE d.id = ? AND m.user_id = ? AND m.status = 'active'""",
@@ -560,7 +562,7 @@ class Database:
                 raise ValueError(
                     "A document referenced by an approved research dataset cannot be deleted."
                 )
-            return row["storage_key"]
+            return row["storage_key"], row["institution_id"]
 
     def delete_document(self, user_id: str, document_id: str) -> str:
         with self.connection() as connection:
