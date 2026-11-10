@@ -1276,10 +1276,20 @@ class ResearchApiTests(unittest.TestCase):
         secret = os.environ["WURI_SESSION_SECRET"]
         token = main.create_session_token(user_id, secret)
         claims = main.read_session_claims(token, secret)
+
+        assert claims is not None
+        assert claims["user_id"] == user_id
+
         self.database.create_session(
             str(claims["session_id"]), user_id, int(claims["expires_at"])
         )
+
+        self.client.cookies.clear()
         self.client.cookies.set(main.SESSION_COOKIE, token)
+
+        response = self.client.get("/api/auth/session")
+        assert response.status_code == 200, response.text
+        assert response.json()["user"]["id"] == user_id
 
     def test_csv_parser_rejects_malformed_rows_and_integer_labels_are_normalized(self):
         records, errors = parse_research_upload(
@@ -1521,10 +1531,20 @@ class ResearchApiTests(unittest.TestCase):
             secret = os.environ["WURI_SESSION_SECRET"]
             token = main.create_session_token(reviewer_id, secret)
             claims = main.read_session_claims(token, secret)
+
+            assert claims is not None
+            assert claims["user_id"] == reviewer_id
+
             self.database.create_session(
                 str(claims["session_id"]), reviewer_id, int(claims["expires_at"])
             )
+
+            self.client.cookies.clear()
             self.client.cookies.set(main.SESSION_COOKIE, token)
+
+            response = self.client.get("/api/auth/session")
+            assert response.status_code == 200, response.text
+            assert response.json()["user"]["id"] == reviewer_id
 
         act_as(reviewers[0])
         first_response = self.client.post(

@@ -116,7 +116,12 @@ class DocumentProcessingTests(unittest.TestCase):
                     archive.writestr("[Content_Types].xml", "<Types/>")
                     archive.writestr("word/document.xml", "<document/>")
                     archive.writestr(unsafe_name, "unsafe")
-                with self.assertRaisesRegex(ValueError, "unsafe archive path"):
+                expected_error = (
+                    "unsafe archive path|duplicate archive paths"
+                    if unsafe_name == "word\\document.xml"
+                    else "unsafe archive path"
+                )
+                with self.assertRaisesRegex(ValueError, expected_error):
                     extract_blocks("windows-path.docx", output.getvalue())
 
     def test_segmentation_is_ordered_and_overlaps_long_text(self):
