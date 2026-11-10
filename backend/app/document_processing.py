@@ -279,6 +279,7 @@ def extract_blocks_isolated(
         for key, value in os.environ.items()
         if key in {
             "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR",
+            "APPDATA",
             "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "LANG", "LC_ALL",
         }
     }
