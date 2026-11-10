@@ -733,6 +733,19 @@ def download_document(document_id: str, session: str | None = Cookie(default=Non
     try:
         content = storage.read(row["storage_key"])
     except (OSError, ValueError) as error:
+        with database.connection() as connection:
+            connection.execute(
+                """INSERT INTO audit_events
+                   (id, institution_id, user_id, event_type, metadata_json)
+                   SELECT lower(hex(randomblob(16))), institution_id, ?,
+                          'document.download_failed', ?
+                   FROM documents WHERE id = ?""",
+                (
+                    user["id"],
+                    json.dumps({"document_id": document_id, "reason": "content_unavailable"}),
+                    document_id,
+                ),
+            )
         raise HTTPException(status_code=404, detail="Document content is unavailable.") from error
     with database.connection() as connection:
         connection.execute(
@@ -867,7 +880,8 @@ def reconcile_storage_cleanup(
     session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ):
     user = current_user(session)
-    pending = database.pending_storage_cleanups(user["id"], limit=50)
+    # Hard cap work per request even if a caller supplies manipulated query input.
+    pending = database.pending_storage_cleanups(user["id"], limit=25)
     deleted = 0
     failed = 0
     for item in pending:
@@ -895,7 +909,7 @@ def reconcile_storage_cleanup(
         "checked": len(pending),
         "deleted": deleted,
         "failed": failed,
-        "remaining": len(database.pending_storage_cleanups(user["id"], limit=100)),
+        "remaining": len(database.pending_storage_cleanups(user["id"], limit=25)),
     }
 
 
