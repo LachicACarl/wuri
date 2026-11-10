@@ -21,7 +21,7 @@ class MigrationRunnerTests(unittest.TestCase):
 
         migration_root = Path(__file__).resolve().parents[1] / "migrations"
         migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
-        self.assertEqual(len(migrations), 10)
+        self.assertEqual(len(migrations), 11)
 
         connection = sqlite3.connect(":memory:")
         connection.row_factory = sqlite3.Row
