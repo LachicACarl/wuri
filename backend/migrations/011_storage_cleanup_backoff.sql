@@ -33,7 +33,8 @@ FROM storage_cleanup_queue;
 DROP TABLE storage_cleanup_queue;
 ALTER TABLE storage_cleanup_queue_v2 RENAME TO storage_cleanup_queue;
 
-CREATE INDEX IF NOT EXISTS ix_storage_cleanup_queue_pending
+-- Recreate the indexes after the rebuilt table has been renamed.
+CREATE INDEX ix_storage_cleanup_queue_pending
     ON storage_cleanup_queue(status, created_at);
-CREATE INDEX IF NOT EXISTS ix_storage_cleanup_queue_due
+CREATE INDEX ix_storage_cleanup_queue_due
     ON storage_cleanup_queue(status, next_attempt_at, created_at);
