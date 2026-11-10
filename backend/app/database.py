@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import secrets
 import sqlite3
 from collections import defaultdict
 from contextlib import contextmanager
@@ -663,18 +664,18 @@ class Database:
             ).fetchall()
             return [dict(row) for row in rows]
 
-    def claim_storage_cleanup(self, user_id: str, cleanup_id: str) -> bool:
-        """Atomically lease one pending or abandoned cleanup item to an admin."""
+    def claim_storage_cleanup(self, user_id: str, cleanup_id: str) -> str | None:
+        """Atomically claim due work and return a fresh per-lease capability."""
+        token = secrets.token_urlsafe(32)
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
                    SET status = 'processing', claimed_at = CURRENT_TIMESTAMP,
-                       updated_at = CURRENT_TIMESTAMP
+                       claim_token = ?, updated_at = CURRENT_TIMESTAMP
                    WHERE id = ?
                      AND (
-                       (status = 'pending'
-                        AND (next_attempt_at IS NULL
-                             OR next_attempt_at <= CURRENT_TIMESTAMP))
+                       (status = 'pending' AND (next_attempt_at IS NULL
+                                                OR next_attempt_at <= CURRENT_TIMESTAMP))
                        OR (status = 'processing'
                            AND claimed_at < datetime('now', '-5 minutes'))
                      )
@@ -684,61 +685,80 @@ class Database:
                              storage_cleanup_queue.institution_id
                          AND m.status = 'active' AND m.role = 'administrator'
                      )""",
-                (cleanup_id, user_id),
+                (token, cleanup_id, user_id),
             )
-            return cursor.rowcount == 1
+            return token if cursor.rowcount == 1 else None
 
     def record_storage_cleanup_failure(
-        self, user_id: str, cleanup_id: str, safe_reason: str,
-        max_attempts: int = 5,
+        self, user_id: str, cleanup_id: str, claim_token: str,
+        safe_reason: str, max_attempts: int = 5,
     ) -> None:
-        """Record a bounded retry with capped exponential backoff.
-
-        Attempts 1-4 return to pending after 2, 4, 8, and 16 minutes.
-        Attempt 5 becomes terminal 'failed' and is never auto-claimed again.
-        """
+        """Retry only when the caller still owns the active lease."""
+        if not claim_token:
+            raise PermissionError("A valid cleanup claim is required.")
         attempts_limit = max(1, min(int(max_attempts), 5))
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
                    SET attempts = attempts + 1,
                        status = CASE WHEN attempts + 1 >= ? THEN 'failed' ELSE 'pending' END,
-                       claimed_at = NULL,
-                       reason = ?,
-                       last_error_at = CURRENT_TIMESTAMP,
+                       claimed_at = NULL, claim_token = NULL,
+                       reason = ?, last_error_at = CURRENT_TIMESTAMP,
                        next_attempt_at = CASE
                            WHEN attempts + 1 >= ? THEN NULL
                            ELSE datetime('now', printf('+%d minutes',
                                MIN(30, (1 << MIN(attempts + 1, 5)))))
                        END,
                        failed_at = CASE
-                           WHEN attempts + 1 >= ? THEN CURRENT_TIMESTAMP
-                           ELSE NULL
-                       END,
+                           WHEN attempts + 1 >= ? THEN CURRENT_TIMESTAMP ELSE NULL END,
                        updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ? AND status = 'processing'
+                   WHERE id = ? AND status = 'processing' AND claim_token = ?
                      AND EXISTS (
                        SELECT 1 FROM institution_memberships m
                        WHERE m.user_id = ? AND m.institution_id =
                              storage_cleanup_queue.institution_id
                          AND m.status = 'active' AND m.role = 'administrator'
                      )""",
-                (
-                    attempts_limit, safe_reason[:500], attempts_limit, attempts_limit,
-                    cleanup_id, user_id,
-                ),
+                (attempts_limit, safe_reason[:500], attempts_limit, attempts_limit,
+                 cleanup_id, claim_token, user_id),
             )
             if cursor.rowcount != 1:
-                raise PermissionError("Administrator document access is required.")
+                raise PermissionError("Cleanup claim is stale or administrator access is required.")
 
-    def complete_storage_cleanup(self, user_id: str, cleanup_id: str) -> None:
+    def complete_storage_cleanup(
+        self, user_id: str, cleanup_id: str, claim_token: str,
+    ) -> None:
+        """Complete only when the caller still owns the active lease."""
+        if not claim_token:
+            raise PermissionError("A valid cleanup claim is required.")
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
-                   SET status = 'completed', claimed_at = NULL,
+                   SET status = 'completed', claimed_at = NULL, claim_token = NULL,
                        completed_at = CURRENT_TIMESTAMP, next_attempt_at = NULL,
                        updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ? AND status = 'processing'
+                   WHERE id = ? AND status = 'processing' AND claim_token = ?
+                     AND EXISTS (
+                       SELECT 1 FROM institution_memberships m
+                       WHERE m.user_id = ? AND m.institution_id =
+                             storage_cleanup_queue.institution_id
+                         AND m.status = 'active' AND m.role = 'administrator'
+                     )""",
+                (cleanup_id, claim_token, user_id),
+            )
+            if cursor.rowcount != 1:
+                raise PermissionError("Cleanup claim is stale or administrator access is required.")
+
+    def requeue_failed_storage_cleanup(self, user_id: str, cleanup_id: str) -> None:
+        """Requeue a terminal failure for an active institution administrator."""
+        with self.connection() as connection:
+            cursor = connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET status = 'pending', attempts = 0, claimed_at = NULL,
+                       claim_token = NULL, next_attempt_at = NULL,
+                       failed_at = NULL, last_error_at = NULL, completed_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ? AND status = 'failed'
                      AND EXISTS (
                        SELECT 1 FROM institution_memberships m
                        WHERE m.user_id = ? AND m.institution_id =
@@ -748,7 +768,13 @@ class Database:
                 (cleanup_id, user_id),
             )
             if cursor.rowcount != 1:
-                raise PermissionError("Administrator document access is required.")
+                raise PermissionError("Failed cleanup item or administrator access not found.")
+            row = connection.execute(
+                "SELECT institution_id FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup_id,),
+            ).fetchone()
+            _event(connection, row["institution_id"], None, user_id,
+                   "document.storage_cleanup_requeued", {"cleanup_id": cleanup_id})
 
     def remove_empty_assessment(self, user_id: str, assessment_id: str):
         with self.connection() as connection:

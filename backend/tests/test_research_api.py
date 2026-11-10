@@ -564,9 +564,10 @@ class ResearchApiTests(unittest.TestCase):
         first_id = cleanup_ids[0]
 
         for attempt in range(1, 5):
-            self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+            claim_token = self.database.claim_storage_cleanup(user_id, first_id)
+            self.assertTrue(claim_token)
             self.database.record_storage_cleanup_failure(
-                user_id, first_id, f"synthetic transient failure {attempt}",
+                user_id, first_id, claim_token, f"synthetic transient failure {attempt}",
             )
             with self.database.connection() as connection:
                 row = connection.execute(
@@ -578,7 +579,7 @@ class ResearchApiTests(unittest.TestCase):
             self.assertEqual(row["attempts"], attempt)
             self.assertIsNotNone(row["next_attempt_at"])
             self.assertIsNone(row["failed_at"])
-            self.assertFalse(self.database.claim_storage_cleanup(user_id, first_id))
+            self.assertIsNone(self.database.claim_storage_cleanup(user_id, first_id))
             with self.database.connection() as connection:
                 connection.execute(
                     """UPDATE storage_cleanup_queue
@@ -587,9 +588,10 @@ class ResearchApiTests(unittest.TestCase):
                     (first_id,),
                 )
 
-        self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+        claim_token = self.database.claim_storage_cleanup(user_id, first_id)
+        self.assertTrue(claim_token)
         self.database.record_storage_cleanup_failure(
-            user_id, first_id, "synthetic terminal failure",
+            user_id, first_id, claim_token, "synthetic terminal failure",
         )
         with self.database.connection() as connection:
             terminal = connection.execute(
@@ -679,7 +681,8 @@ class ResearchApiTests(unittest.TestCase):
         cleanup_id = self.database.enqueue_storage_cleanup(
             user_id, institution_id, document_id, staged_key, "synthetic revocation test",
         )
-        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        claim_token = self.database.claim_storage_cleanup(user_id, cleanup_id)
+        self.assertTrue(claim_token)
         with self.database.connection() as connection:
             connection.execute(
                 """UPDATE institution_memberships SET status = 'disabled'
@@ -687,7 +690,7 @@ class ResearchApiTests(unittest.TestCase):
                 (user_id, institution_id),
             )
         with self.assertRaises(PermissionError):
-            self.database.complete_storage_cleanup(user_id, cleanup_id)
+            self.database.complete_storage_cleanup(user_id, cleanup_id, claim_token)
         with self.database.connection() as connection:
             row = connection.execute(
                 "SELECT status FROM storage_cleanup_queue WHERE id = ?", (cleanup_id,)
@@ -930,8 +933,9 @@ class ResearchApiTests(unittest.TestCase):
             ".wuri-delete-" + "a" * 32, "synthetic lease test",
         )
 
-        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
-        self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        old_token = self.database.claim_storage_cleanup(user_id, cleanup_id)
+        self.assertTrue(old_token)
+        self.assertIsNone(self.database.claim_storage_cleanup(user_id, cleanup_id))
 
         with self.database.connection() as connection:
             connection.execute(
@@ -942,9 +946,13 @@ class ResearchApiTests(unittest.TestCase):
             )
         stale = self.database.pending_storage_cleanups(user_id)
         self.assertTrue(any(item["id"] == cleanup_id for item in stale))
-        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        new_token = self.database.claim_storage_cleanup(user_id, cleanup_id)
+        self.assertTrue(new_token)
+        self.assertNotEqual(old_token, new_token)
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, cleanup_id, old_token)
 
-        self.database.complete_storage_cleanup(user_id, cleanup_id)
+        self.database.complete_storage_cleanup(user_id, cleanup_id, new_token)
         with self.database.connection() as connection:
             status = connection.execute(
                 "SELECT status, claimed_at FROM storage_cleanup_queue WHERE id = ?",
@@ -1058,10 +1066,10 @@ class ResearchApiTests(unittest.TestCase):
         visible = self.database.pending_storage_cleanups(user_id)
         self.assertFalse(any(item["id"] == foreign_cleanup for item in visible))
         with self.assertRaises(PermissionError):
-            self.database.complete_storage_cleanup(user_id, foreign_cleanup)
+            self.database.complete_storage_cleanup(user_id, foreign_cleanup, 'invalid-claim')
         with self.assertRaises(PermissionError):
             self.database.record_storage_cleanup_failure(
-                user_id, foreign_cleanup, "unauthorized attempt",
+                user_id, foreign_cleanup, "invalid-claim", "unauthorized attempt",
             )
 
     def test_cleanup_enqueue_rejects_non_admin_in_same_institution(self):
@@ -1109,7 +1117,7 @@ class ResearchApiTests(unittest.TestCase):
             try:
                 barrier.wait(timeout=5)
                 results.append(
-                    database_instance.claim_storage_cleanup(user_id, cleanup_id)
+                    bool(database_instance.claim_storage_cleanup(user_id, cleanup_id))
                 )
             except Exception as error:
                 errors.append(error)
@@ -1181,6 +1189,8 @@ class ResearchApiTests(unittest.TestCase):
             user_id, institution_id, document_id,
             ".wuri-delete-" + "b" * 32, "synthetic authorization test",
         )
+        claim_token = self.database.claim_storage_cleanup(user_id, cleanup_id)
+        self.assertTrue(claim_token)
         with self.database.connection() as connection:
             connection.execute(
                 """UPDATE institution_memberships
@@ -1190,12 +1200,50 @@ class ResearchApiTests(unittest.TestCase):
             )
         self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
         with self.assertRaises(PermissionError):
-            self.database.complete_storage_cleanup(user_id, cleanup_id)
+            self.database.complete_storage_cleanup(user_id, cleanup_id, claim_token)
         with self.assertRaises(PermissionError):
             self.database.record_storage_cleanup_failure(
-                user_id, cleanup_id, "synthetic failure"
+                user_id, cleanup_id, claim_token, "synthetic failure"
             )
 
+
+    def test_failed_cleanup_can_be_requeued_by_admin_and_audited(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "f" * 32, "synthetic requeue test",
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET status = 'failed', attempts = 5, failed_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (cleanup_id,),
+            )
+        response = self.client.post(f"/api/storage/cleanup/{cleanup_id}/requeue")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["requeued"])
+        with self.database.connection() as connection:
+            row = connection.execute(
+                """SELECT status, attempts, claim_token, failed_at
+                   FROM storage_cleanup_queue WHERE id = ?""",
+                (cleanup_id,),
+            ).fetchone()
+            event = connection.execute(
+                """SELECT event_type, metadata_json FROM audit_events
+                   WHERE event_type = 'document.storage_cleanup_requeued'
+                     AND user_id = ?""",
+                (user_id,),
+            ).fetchone()
+        self.assertEqual(row["status"], "pending")
+        self.assertEqual(row["attempts"], 0)
+        self.assertIsNone(row["claim_token"])
+        self.assertIsNone(row["failed_at"])
+        self.assertIsNotNone(event)
+        self.assertEqual(json.loads(event["metadata_json"])["cleanup_id"], cleanup_id)
 
     def _create_document_for_delete(self):
         user_id = self.database.user_by_username("research-admin")["id"]
@@ -1228,10 +1276,20 @@ class ResearchApiTests(unittest.TestCase):
         secret = os.environ["WURI_SESSION_SECRET"]
         token = main.create_session_token(user_id, secret)
         claims = main.read_session_claims(token, secret)
+
+        assert claims is not None
+        assert claims["user_id"] == user_id
+
         self.database.create_session(
             str(claims["session_id"]), user_id, int(claims["expires_at"])
         )
+
+        self.client.cookies.clear()
         self.client.cookies.set(main.SESSION_COOKIE, token)
+
+        response = self.client.get("/api/auth/session")
+        assert response.status_code == 200, response.text
+        assert response.json()["user"]["id"] == user_id
 
     def test_csv_parser_rejects_malformed_rows_and_integer_labels_are_normalized(self):
         records, errors = parse_research_upload(
@@ -1473,10 +1531,20 @@ class ResearchApiTests(unittest.TestCase):
             secret = os.environ["WURI_SESSION_SECRET"]
             token = main.create_session_token(reviewer_id, secret)
             claims = main.read_session_claims(token, secret)
+
+            assert claims is not None
+            assert claims["user_id"] == reviewer_id
+
             self.database.create_session(
                 str(claims["session_id"]), reviewer_id, int(claims["expires_at"])
             )
+
+            self.client.cookies.clear()
             self.client.cookies.set(main.SESSION_COOKIE, token)
+
+            response = self.client.get("/api/auth/session")
+            assert response.status_code == 200, response.text
+            assert response.json()["user"]["id"] == reviewer_id
 
         act_as(reviewers[0])
         first_response = self.client.post(

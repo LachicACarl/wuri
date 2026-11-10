@@ -880,22 +880,22 @@ def reconcile_storage_cleanup(
     session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ):
     user = current_user(session)
-    # Hard cap work per request even if a caller supplies manipulated query input.
     pending = database.pending_storage_cleanups(user["id"], limit=25)
     deleted = 0
     failed = 0
     for item in pending:
-        if not database.claim_storage_cleanup(user["id"], item["id"]):
+        claim_token = database.claim_storage_cleanup(user["id"], item["id"])
+        if claim_token is None:
             continue
         try:
             storage.delete_staged(item["storage_key"])
-            database.complete_storage_cleanup(user["id"], item["id"])
+            database.complete_storage_cleanup(user["id"], item["id"], claim_token)
             deleted += 1
         except Exception as error:
             failed += 1
             try:
                 database.record_storage_cleanup_failure(
-                    user["id"], item["id"],
+                    user["id"], item["id"], claim_token,
                     "Staged object cleanup failed: " + type(error).__name__,
                 )
             except Exception:
@@ -906,11 +906,22 @@ def reconcile_storage_cleanup(
                 "Staged storage cleanup %s failed.", item["id"],
             )
     return {
-        "checked": len(pending),
-        "deleted": deleted,
-        "failed": failed,
+        "checked": len(pending), "deleted": deleted, "failed": failed,
         "remaining": len(database.pending_storage_cleanups(user["id"], limit=25)),
     }
+
+
+@app.post("/api/storage/cleanup/{cleanup_id}/requeue")
+def requeue_storage_cleanup(
+    cleanup_id: str,
+    session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+):
+    user = current_user(session)
+    try:
+        database.requeue_failed_storage_cleanup(user["id"], cleanup_id)
+    except PermissionError as error:
+        raise HTTPException(status_code=404, detail="Failed cleanup item not found.") from error
+    return {"requeued": True, "cleanup_id": cleanup_id}
 
 
 @app.get("/api/research/validation/status")
