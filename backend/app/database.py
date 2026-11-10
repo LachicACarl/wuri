@@ -641,6 +641,7 @@ class Database:
     def pending_storage_cleanups(
         self, user_id: str, limit: int = 50,
     ) -> list[dict[str, Any]]:
+        """Return due work only; cap each caller batch to prevent unbounded scans."""
         with self.connection() as connection:
             rows = connection.execute(
                 """SELECT q.id, q.institution_id, q.document_id, q.storage_key,
@@ -651,12 +652,14 @@ class Database:
                    WHERE m.user_id = ? AND m.status = 'active'
                      AND m.role = 'administrator'
                      AND (
-                       q.status = 'pending'
+                       (q.status = 'pending'
+                        AND (q.next_attempt_at IS NULL
+                             OR q.next_attempt_at <= CURRENT_TIMESTAMP))
                        OR (q.status = 'processing'
                            AND q.claimed_at < datetime('now', '-5 minutes'))
                      )
-                   ORDER BY q.created_at ASC LIMIT ?""",
-                (user_id, max(1, min(int(limit), 100))),
+                   ORDER BY q.created_at ASC, q.id ASC LIMIT ?""",
+                (user_id, max(1, min(int(limit), 25))),
             ).fetchall()
             return [dict(row) for row in rows]
 
@@ -669,7 +672,9 @@ class Database:
                        updated_at = CURRENT_TIMESTAMP
                    WHERE id = ?
                      AND (
-                       status = 'pending'
+                       (status = 'pending'
+                        AND (next_attempt_at IS NULL
+                             OR next_attempt_at <= CURRENT_TIMESTAMP))
                        OR (status = 'processing'
                            AND claimed_at < datetime('now', '-5 minutes'))
                      )
@@ -685,12 +690,31 @@ class Database:
 
     def record_storage_cleanup_failure(
         self, user_id: str, cleanup_id: str, safe_reason: str,
+        max_attempts: int = 5,
     ) -> None:
+        """Record a bounded retry with capped exponential backoff.
+
+        Attempts 1-4 return to pending after 2, 4, 8, and 16 minutes.
+        Attempt 5 becomes terminal 'failed' and is never auto-claimed again.
+        """
+        attempts_limit = max(1, min(int(max_attempts), 5))
         with self.connection() as connection:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
-                   SET status = 'pending', claimed_at = NULL,
-                       attempts = attempts + 1, reason = ?,
+                   SET attempts = attempts + 1,
+                       status = CASE WHEN attempts + 1 >= ? THEN 'failed' ELSE 'pending' END,
+                       claimed_at = NULL,
+                       reason = ?,
+                       last_error_at = CURRENT_TIMESTAMP,
+                       next_attempt_at = CASE
+                           WHEN attempts + 1 >= ? THEN NULL
+                           ELSE datetime('now', printf('+%d minutes',
+                               MIN(30, (1 << MIN(attempts + 1, 5)))))
+                       END,
+                       failed_at = CASE
+                           WHEN attempts + 1 >= ? THEN CURRENT_TIMESTAMP
+                           ELSE NULL
+                       END,
                        updated_at = CURRENT_TIMESTAMP
                    WHERE id = ? AND status = 'processing'
                      AND EXISTS (
@@ -699,7 +723,10 @@ class Database:
                              storage_cleanup_queue.institution_id
                          AND m.status = 'active' AND m.role = 'administrator'
                      )""",
-                (safe_reason[:500], cleanup_id, user_id),
+                (
+                    attempts_limit, safe_reason[:500], attempts_limit, attempts_limit,
+                    cleanup_id, user_id,
+                ),
             )
             if cursor.rowcount != 1:
                 raise PermissionError("Administrator document access is required.")
@@ -709,7 +736,7 @@ class Database:
             cursor = connection.execute(
                 """UPDATE storage_cleanup_queue
                    SET status = 'completed', claimed_at = NULL,
-                       completed_at = CURRENT_TIMESTAMP,
+                       completed_at = CURRENT_TIMESTAMP, next_attempt_at = NULL,
                        updated_at = CURRENT_TIMESTAMP
                    WHERE id = ? AND status = 'processing'
                      AND EXISTS (
