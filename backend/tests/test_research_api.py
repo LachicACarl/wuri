@@ -510,6 +510,105 @@ class ResearchApiTests(unittest.TestCase):
             )
         self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
 
+    def test_cleanup_queue_caps_batches_and_applies_backoff_until_terminal_failure(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_ids = []
+        for index in range(27):
+            staged_key = ".wuri-delete-" + f"{index:032x}"
+            cleanup_ids.append(self.database.enqueue_storage_cleanup(
+                user_id, institution_id, document_id, staged_key,
+                f"synthetic batch fixture {index}",
+            ))
+
+        self.assertEqual(len(self.database.pending_storage_cleanups(user_id, limit=500)), 25)
+        first_id = cleanup_ids[0]
+
+        for attempt in range(1, 5):
+            self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+            self.database.record_storage_cleanup_failure(
+                user_id, first_id, f"synthetic transient failure {attempt}",
+            )
+            with self.database.connection() as connection:
+                row = connection.execute(
+                    """SELECT status, attempts, next_attempt_at, failed_at
+                       FROM storage_cleanup_queue WHERE id = ?""",
+                    (first_id,),
+                ).fetchone()
+            self.assertEqual(row["status"], "pending")
+            self.assertEqual(row["attempts"], attempt)
+            self.assertIsNotNone(row["next_attempt_at"])
+            self.assertIsNone(row["failed_at"])
+            self.assertFalse(self.database.claim_storage_cleanup(user_id, first_id))
+            with self.database.connection() as connection:
+                connection.execute(
+                    """UPDATE storage_cleanup_queue
+                       SET next_attempt_at = datetime('now', '-1 minute')
+                       WHERE id = ?""",
+                    (first_id,),
+                )
+
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+        self.database.record_storage_cleanup_failure(
+            user_id, first_id, "synthetic terminal failure",
+        )
+        with self.database.connection() as connection:
+            terminal = connection.execute(
+                """SELECT status, attempts, next_attempt_at, failed_at
+                   FROM storage_cleanup_queue WHERE id = ?""",
+                (first_id,),
+            ).fetchone()
+        self.assertEqual(terminal["status"], "failed")
+        self.assertEqual(terminal["attempts"], 5)
+        self.assertIsNone(terminal["next_attempt_at"])
+        self.assertIsNotNone(terminal["failed_at"])
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, first_id))
+        self.assertNotIn(
+            first_id,
+            {row["id"] for row in self.database.pending_storage_cleanups(user_id, limit=100)},
+        )
+
+    def test_successful_document_download_is_audited(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            row = connection.execute(
+                """SELECT event_type, metadata_json FROM audit_events
+                   WHERE event_type = 'document.downloaded'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["event_type"], "document.downloaded")
+        self.assertEqual(json.loads(row["metadata_json"]), {"document_id": document_id})
+
+    def test_failed_document_download_is_audited_without_exposing_storage_details(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            self.storage, "read", side_effect=OSError("sensitive local path must not be logged")
+        ):
+            response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 404)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                """SELECT event_type, metadata_json FROM audit_events
+                   WHERE event_type = 'document.download_failed'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        metadata = json.loads(row["metadata_json"])
+        self.assertEqual(metadata, {
+            "document_id": document_id, "reason": "content_unavailable",
+        })
+        self.assertNotIn("sensitive", row["metadata_json"])
+
     def test_revoked_membership_blocks_document_download(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
