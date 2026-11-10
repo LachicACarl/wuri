@@ -86,6 +86,29 @@ class MigrationRunnerTests(unittest.TestCase):
                     connection.execute("PRAGMA foreign_keys").fetchone()[0], 1
                 )
 
+    def test_migration_011_adds_cleanup_retry_columns_and_failed_status(self):
+        import tempfile
+        from pathlib import Path
+        from app.database import Database
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Database(Path(directory) / "migration-011.sqlite3")
+            with database.connection() as connection:
+                columns = {
+                    row["name"] for row in connection.execute(
+                        "PRAGMA table_info(storage_cleanup_queue)"
+                    )
+                }
+                self.assertTrue({
+                    "next_attempt_at", "last_error_at", "failed_at"
+                }.issubset(columns))
+                migration = connection.execute(
+                    "SELECT 1 FROM schema_migrations WHERE migration_name = ?",
+                    ("011_storage_cleanup_backoff.sql",),
+                ).fetchone()
+                self.assertIsNotNone(migration)
+                self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+
     def test_failed_migration_restores_foreign_keys_and_can_restart(self):
         self.connection.execute("CREATE TABLE parent (id TEXT PRIMARY KEY)")
         self.connection.execute(
