@@ -1,3 +1,12 @@
+-- Add retry metadata to databases created by migrations 001-010 before
+-- copying it into the rebuilt queue table.
+ALTER TABLE storage_cleanup_queue
+    ADD COLUMN next_attempt_at TEXT;
+ALTER TABLE storage_cleanup_queue
+    ADD COLUMN last_error_at TEXT;
+ALTER TABLE storage_cleanup_queue
+    ADD COLUMN failed_at TEXT;
+
 -- Rebuild the cleanup queue to add a terminal failed status while retaining
 -- every existing item, lease and audit-relevant value. SQLite cannot alter a
 -- CHECK constraint in place.
