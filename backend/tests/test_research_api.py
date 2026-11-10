@@ -809,12 +809,25 @@ class ResearchApiTests(unittest.TestCase):
             failed = self.client.post("/api/storage/cleanup/reconcile")
         self.assertEqual(failed.status_code, 200, failed.text)
         self.assertEqual(failed.json()["failed"], 1)
+        with self.database.connection() as connection:
+            retry_row = connection.execute(
+                "SELECT attempts, next_attempt_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup["id"],),
+            ).fetchone()
+        self.assertEqual(retry_row["attempts"], 1)
+        self.assertIsNotNone(retry_row["next_attempt_at"])
         self.assertEqual(
             self.database.pending_storage_cleanups(
                 self.database.user_by_username("research-admin")["id"]
-            )[0]["attempts"],
-            1,
+            ),
+            [],
         )
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET next_attempt_at = datetime('now', '-1 minute') WHERE id = ?""",
+                (cleanup["id"],),
+            )
 
         retried = self.client.post("/api/storage/cleanup/reconcile")
         self.assertEqual(retried.status_code, 200, retried.text)
@@ -929,7 +942,7 @@ class ResearchApiTests(unittest.TestCase):
         with self.database.connection() as connection:
             connection.execute(
                 """UPDATE storage_cleanup_queue
-                   SET claimed_at = datetime('now', '-6 minutes')
+                   SET next_attempt_at = datetime('now', '-1 minute')
                    WHERE id = ?""",
                 (cleanup_id,),
             )
