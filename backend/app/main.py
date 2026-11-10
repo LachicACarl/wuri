@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import quote
 from typing import Any, Literal
 from uuid import uuid4
+from threading import Lock
 
 from fastapi import Cookie, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +39,17 @@ from .cors_config import configured_cors_origins
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+
+# Serialize in-process deletion attempts for the same document. The lock is
+# held across quarantine, database deletion, and final cleanup so two requests
+# cannot stage or restore the same private object concurrently.
+_document_delete_locks_guard = Lock()
+_document_delete_locks: dict[str, Lock] = {}
+
+
+def document_delete_lock(document_id: str) -> Lock:
+    with _document_delete_locks_guard:
+        return _document_delete_locks.setdefault(document_id, Lock())
 
 app = FastAPI(title="WURI Ranking Readiness API")
 # The last middleware registered is outermost in Starlette. Keep CORS outside
@@ -721,6 +733,19 @@ def download_document(document_id: str, session: str | None = Cookie(default=Non
     try:
         content = storage.read(row["storage_key"])
     except (OSError, ValueError) as error:
+        with database.connection() as connection:
+            connection.execute(
+                """INSERT INTO audit_events
+                   (id, institution_id, user_id, event_type, metadata_json)
+                   SELECT lower(hex(randomblob(16))), institution_id, ?,
+                          'document.download_failed', ?
+                   FROM documents WHERE id = ?""",
+                (
+                    user["id"],
+                    json.dumps({"document_id": document_id, "reason": "content_unavailable"}),
+                    document_id,
+                ),
+            )
         raise HTTPException(status_code=404, detail="Document content is unavailable.") from error
     with database.connection() as connection:
         connection.execute(
@@ -793,37 +818,52 @@ def delete_document(
 ):
     user = current_user(session)
     try:
-        storage_key = database.document_storage_key_for_deletion(user["id"], document_id)
-        staged_key = storage.stage_delete(storage_key)
-        try:
-            database.delete_document(user["id"], document_id)
-        except Exception as deletion_error:
+        with document_delete_lock(document_id):
+            storage_key, institution_id = database.document_storage_key_for_deletion(user["id"], document_id)
+            staged_key = storage.stage_delete(storage_key)
+            try:
+                database.delete_document(user["id"], document_id)
+            except Exception as deletion_error:
+                if staged_key:
+                    try:
+                        storage.restore_staged_delete(staged_key, storage_key)
+                    except Exception:
+                        logging.getLogger(__name__).exception(
+                            "Unable to restore staged document %s after database deletion failed.",
+                            document_id,
+                        )
+                        raise HTTPException(
+                            status_code=500,
+                            detail="Document deletion failed; private-file recovery is required.",
+                        ) from deletion_error
+                raise
             if staged_key:
                 try:
-                    storage.restore_staged_delete(staged_key, storage_key)
-                except Exception:
+                    storage.finalize_staged_delete(staged_key)
+                except Exception as cleanup_error:
                     logging.getLogger(__name__).exception(
-                        "Unable to restore staged document %s after database deletion failed.",
+                        "Document %s was removed from the database but its staged file needs cleanup.",
                         document_id,
                     )
-                    raise HTTPException(
-                        status_code=500,
-                        detail="Document deletion failed; private-file recovery is required.",
-                    ) from deletion_error
-            raise
-        if staged_key:
-            try:
-                storage.finalize_staged_delete(staged_key)
-            except OSError:
-                logging.getLogger(__name__).exception(
-                    "Document %s was removed from the database but its staged file needs cleanup.",
-                    document_id,
-                )
-                return {
-                    "deleted": True,
-                    "cleanup_pending": True,
-                    "document_id": document_id,
-                }
+                    try:
+                        database.enqueue_storage_cleanup(
+                            user["id"], institution_id, document_id, staged_key,
+                            "Final deletion failed: " + type(cleanup_error).__name__,
+                        )
+                    except Exception as queue_error:
+                        logging.getLogger(__name__).exception(
+                            "Unable to persist cleanup queue entry for document %s.",
+                            document_id,
+                        )
+                        raise HTTPException(
+                            status_code=500,
+                            detail="The document was deleted, but private-file cleanup needs manual recovery.",
+                        ) from queue_error
+                    return {
+                        "deleted": True,
+                        "cleanup_pending": True,
+                        "document_id": document_id,
+                    }
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
     except ValueError as error:
@@ -833,6 +873,44 @@ def delete_document(
             status_code=503, detail="Private document storage is unavailable."
         ) from error
     return {"deleted": True, "cleanup_pending": False, "document_id": document_id}
+
+
+@app.post("/api/storage/cleanup/reconcile")
+def reconcile_storage_cleanup(
+    session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+):
+    user = current_user(session)
+    # Hard cap work per request even if a caller supplies manipulated query input.
+    pending = database.pending_storage_cleanups(user["id"], limit=25)
+    deleted = 0
+    failed = 0
+    for item in pending:
+        if not database.claim_storage_cleanup(user["id"], item["id"]):
+            continue
+        try:
+            storage.delete_staged(item["storage_key"])
+            database.complete_storage_cleanup(user["id"], item["id"])
+            deleted += 1
+        except Exception as error:
+            failed += 1
+            try:
+                database.record_storage_cleanup_failure(
+                    user["id"], item["id"],
+                    "Staged object cleanup failed: " + type(error).__name__,
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Unable to release or record failed cleanup lease %s.", item["id"],
+                )
+            logging.getLogger(__name__).exception(
+                "Staged storage cleanup %s failed.", item["id"],
+            )
+    return {
+        "checked": len(pending),
+        "deleted": deleted,
+        "failed": failed,
+        "remaining": len(database.pending_storage_cleanups(user["id"], limit=25)),
+    }
 
 
 @app.get("/api/research/validation/status")

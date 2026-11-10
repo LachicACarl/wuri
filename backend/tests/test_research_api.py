@@ -1,4 +1,6 @@
 import os
+import threading
+import sqlite3
 import csv
 import io
 import json
@@ -8,6 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app import main
@@ -471,6 +474,270 @@ class ResearchApiTests(unittest.TestCase):
                 connection.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,)).fetchone()
             )
 
+
+    def test_document_endpoints_deny_cross_institution_user(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+
+        outsider_id = self.database.ensure_admin(
+            "document-outsider", "synthetic outsider password long"
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                "DELETE FROM institution_memberships WHERE user_id = ?",
+                (outsider_id,),
+            )
+        self._act_as(outsider_id)
+
+        download = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(download.status_code, 404)
+
+        listing = self.client.get(
+            f"/api/institutions/{institution_id}/documents"
+        )
+        self.assertEqual(listing.status_code, 403)
+
+        deletion = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(deletion.status_code, 403)
+
+        with self.database.connection() as connection:
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+
+    def test_cleanup_queue_caps_batches_and_applies_backoff_until_terminal_failure(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_ids = []
+        for index in range(27):
+            staged_key = ".wuri-delete-" + f"{index:032x}"
+            cleanup_ids.append(self.database.enqueue_storage_cleanup(
+                user_id, institution_id, document_id, staged_key,
+                f"synthetic batch fixture {index}",
+            ))
+
+        self.assertEqual(len(self.database.pending_storage_cleanups(user_id, limit=500)), 25)
+        first_id = cleanup_ids[0]
+
+        for attempt in range(1, 5):
+            self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+            self.database.record_storage_cleanup_failure(
+                user_id, first_id, f"synthetic transient failure {attempt}",
+            )
+            with self.database.connection() as connection:
+                row = connection.execute(
+                    """SELECT status, attempts, next_attempt_at, failed_at
+                       FROM storage_cleanup_queue WHERE id = ?""",
+                    (first_id,),
+                ).fetchone()
+            self.assertEqual(row["status"], "pending")
+            self.assertEqual(row["attempts"], attempt)
+            self.assertIsNotNone(row["next_attempt_at"])
+            self.assertIsNone(row["failed_at"])
+            self.assertFalse(self.database.claim_storage_cleanup(user_id, first_id))
+            with self.database.connection() as connection:
+                connection.execute(
+                    """UPDATE storage_cleanup_queue
+                       SET next_attempt_at = datetime('now', '-1 minute')
+                       WHERE id = ?""",
+                    (first_id,),
+                )
+
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, first_id))
+        self.database.record_storage_cleanup_failure(
+            user_id, first_id, "synthetic terminal failure",
+        )
+        with self.database.connection() as connection:
+            terminal = connection.execute(
+                """SELECT status, attempts, next_attempt_at, failed_at
+                   FROM storage_cleanup_queue WHERE id = ?""",
+                (first_id,),
+            ).fetchone()
+        self.assertEqual(terminal["status"], "failed")
+        self.assertEqual(terminal["attempts"], 5)
+        self.assertIsNone(terminal["next_attempt_at"])
+        self.assertIsNotNone(terminal["failed_at"])
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, first_id))
+        self.assertNotIn(
+            first_id,
+            {row["id"] for row in self.database.pending_storage_cleanups(user_id, limit=100)},
+        )
+
+    def test_successful_document_download_is_audited(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            row = connection.execute(
+                """SELECT event_type, metadata_json FROM audit_events
+                   WHERE event_type = 'document.downloaded'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["event_type"], "document.downloaded")
+        self.assertEqual(json.loads(row["metadata_json"]), {"document_id": document_id})
+
+    def test_failed_document_download_is_audited_without_exposing_storage_details(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            self.storage, "read", side_effect=OSError("sensitive local path must not be logged")
+        ):
+            response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 404)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                """SELECT event_type, metadata_json FROM audit_events
+                   WHERE event_type = 'document.download_failed'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        metadata = json.loads(row["metadata_json"])
+        self.assertEqual(metadata, {
+            "document_id": document_id, "reason": "content_unavailable",
+        })
+        self.assertNotIn("sensitive", row["metadata_json"])
+
+    def test_revoked_membership_blocks_document_download(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships SET status = 'disabled'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+
+        response = self.client.get(f"/api/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.storage.read(storage_key), b"synthetic delete fixture")
+        with self.database.connection() as connection:
+            downloads = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.downloaded'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(downloads, 0)
+
+    def test_revoked_membership_cannot_complete_claimed_cleanup(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "e" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "synthetic revocation test",
+        )
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships SET status = 'disabled'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT status FROM storage_cleanup_queue WHERE id = ?", (cleanup_id,)
+            ).fetchone()
+        self.assertEqual(row["status"], "processing")
+
+    def test_concurrent_document_delete_is_serialized_and_idempotently_denied(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        token = self.client.cookies.get(main.SESSION_COOKIE)
+        lock = main.document_delete_lock(document_id)
+        entered = threading.Event()
+        release = threading.Event()
+        acquired = threading.Event()
+
+        def hold_document_lock():
+            with lock:
+                entered.set()
+                if not release.wait(timeout=5):
+                    raise TimeoutError("Lock test did not release document lock.")
+
+        def wait_for_document_lock():
+            with lock:
+                acquired.set()
+
+        holder = threading.Thread(target=hold_document_lock)
+        waiter = threading.Thread(target=wait_for_document_lock)
+        holder.start()
+        self.assertTrue(entered.wait(timeout=5))
+        waiter.start()
+        self.assertFalse(acquired.wait(timeout=0.1))
+        release.set()
+        holder.join(timeout=5)
+        waiter.join(timeout=5)
+        self.assertFalse(holder.is_alive())
+        self.assertFalse(waiter.is_alive())
+        self.assertTrue(acquired.is_set())
+
+        first = main.delete_document(document_id, token)
+        self.assertIsInstance(first, dict)
+        self.assertTrue(first["deleted"])
+        with self.assertRaises(HTTPException) as denied:
+            main.delete_document(document_id, token)
+        self.assertEqual(denied.exception.status_code, 403)
+
+        self.assertFalse((self.storage.root / storage_key).exists())
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+            deleted_events = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.deleted'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(deleted_events, 1)
+
+    def test_viewer_cannot_change_document_verification_metadata(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+        viewer_id = self.database.ensure_admin(
+            "document-viewer", "synthetic viewer password long"
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                "INSERT INTO institution_memberships (user_id, institution_id, role, status) "
+                "VALUES (?, ?, 'viewer', 'active')",
+                (viewer_id, institution_id),
+            )
+        self._act_as(viewer_id)
+        response = self.client.patch(
+            f"/api/documents/{document_id}",
+            json={"review_status": "verified"},
+        )
+        self.assertEqual(response.status_code, 403)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT review_status FROM documents WHERE id = ?",
+                (document_id,),
+            ).fetchone()
+        self.assertNotEqual(row["review_status"], "verified")
+
     def test_document_delete_storage_stage_failure_keeps_database_record(self):
         self.login()
         document_id, storage_key, assessment_id = self._create_document_for_delete()
@@ -515,6 +782,383 @@ class ResearchApiTests(unittest.TestCase):
         staged_files = list(self.storage.root.glob(".wuri-delete-*"))
         self.assertEqual(len(staged_files), 1)
         self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
+
+    def test_cleanup_pending_is_persisted_and_reconciled_with_retry(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=OSError("synthetic unlink failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["cleanup_pending"])
+
+        pending = self.database.pending_storage_cleanups(
+            self.database.user_by_username("research-admin")["id"]
+        )
+        self.assertEqual(len(pending), 1)
+        cleanup = pending[0]
+        self.assertTrue(cleanup["storage_key"].startswith(".wuri-delete-"))
+        self.assertTrue((self.storage.root / cleanup["storage_key"]).exists())
+
+        with patch.object(
+            main.storage, "delete_staged",
+            side_effect=OSError("synthetic cleanup retry failure"),
+        ):
+            failed = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(failed.status_code, 200, failed.text)
+        self.assertEqual(failed.json()["failed"], 1)
+        with self.database.connection() as connection:
+            retry_row = connection.execute(
+                "SELECT attempts, next_attempt_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup["id"],),
+            ).fetchone()
+        self.assertEqual(retry_row["attempts"], 1)
+        self.assertIsNotNone(retry_row["next_attempt_at"])
+        self.assertEqual(
+            self.database.pending_storage_cleanups(
+                self.database.user_by_username("research-admin")["id"]
+            ),
+            [],
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET next_attempt_at = datetime('now', '-1 minute') WHERE id = ?""",
+                (cleanup["id"],),
+            )
+
+        retried = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(retried.status_code, 200, retried.text)
+        self.assertEqual(retried.json()["deleted"], 1)
+        self.assertEqual(retried.json()["remaining"], 0)
+        self.assertFalse((self.storage.root / cleanup["storage_key"]).exists())
+        with self.database.connection() as connection:
+            status = connection.execute(
+                "SELECT status, attempts FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup["id"],),
+            ).fetchone()
+        self.assertEqual(status["status"], "completed")
+        self.assertEqual(status["attempts"], 1)
+
+
+
+    def test_document_delete_unexpected_finalize_error_is_queued(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=RuntimeError("synthetic unexpected finalize failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["cleanup_pending"])
+        user_id = self.database.user_by_username("research-admin")["id"]
+        pending = self.database.pending_storage_cleanups(user_id)
+        self.assertEqual(len(pending), 1)
+        self.assertIn("RuntimeError", pending[0]["reason"])
+        self.assertTrue((self.storage.root / pending[0]["storage_key"]).exists())
+
+    def test_document_delete_reports_manual_recovery_when_queue_write_fails(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with patch.object(
+            main.storage, "finalize_staged_delete",
+            side_effect=RuntimeError("synthetic finalize failure"),
+        ), patch.object(
+            main.database, "enqueue_storage_cleanup",
+            side_effect=sqlite3.OperationalError("synthetic queue database failure"),
+        ):
+            response = self.client.delete(f"/api/documents/{document_id}")
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("manual recovery", response.json()["detail"])
+        with self.database.connection() as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT 1 FROM documents WHERE id = ?", (document_id,)
+                ).fetchone()
+            )
+        staged_files = list(self.storage.root.glob(".wuri-delete-*"))
+        self.assertEqual(len(staged_files), 1)
+        self.assertEqual(staged_files[0].read_bytes(), b"synthetic delete fixture")
+
+    def test_cleanup_claim_is_exclusive_and_stale_lease_can_be_reclaimed(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "a" * 32, "synthetic lease test",
+        )
+
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
+
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET claimed_at = datetime('now', '-6 minutes')
+                   WHERE id = ?""",
+                (cleanup_id,),
+            )
+        stale = self.database.pending_storage_cleanups(user_id)
+        self.assertTrue(any(item["id"] == cleanup_id for item in stale))
+        self.assertTrue(self.database.claim_storage_cleanup(user_id, cleanup_id))
+
+        self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.database.connection() as connection:
+            status = connection.execute(
+                "SELECT status, claimed_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup_id,),
+            ).fetchone()
+        self.assertEqual(status["status"], "completed")
+        self.assertIsNone(status["claimed_at"])
+
+
+    def test_cleanup_retries_when_completion_write_fails_after_file_delete(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "c" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key,
+            "synthetic completion failure",
+        )
+        staged_path = self.storage.root / staged_key
+        staged_path.write_bytes(b"synthetic staged object")
+
+        with patch.object(
+            self.database, "complete_storage_cleanup",
+            side_effect=sqlite3.OperationalError("synthetic completion write failure"),
+        ):
+            response = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["failed"], 1)
+        self.assertFalse(staged_path.exists())
+
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE storage_cleanup_queue
+                   SET next_attempt_at = datetime('now', '-1 minute')
+                   WHERE id = ?""",
+                (cleanup_id,),
+            )
+        retried = self.client.post("/api/storage/cleanup/reconcile")
+        self.assertEqual(retried.status_code, 200, retried.text)
+        self.assertEqual(retried.json()["deleted"], 1)
+        with self.database.connection() as connection:
+            row = connection.execute(
+                "SELECT status, attempts, claimed_at FROM storage_cleanup_queue WHERE id = ?",
+                (cleanup_id,),
+            ).fetchone()
+        self.assertEqual(row["status"], "completed")
+        self.assertIsNone(row["claimed_at"])
+
+    def test_cleanup_enqueue_is_idempotent_for_same_staged_key(self):
+        self.login()
+        document_id, original_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "d" * 32
+        first_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "first reason",
+        )
+        second_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "second reason",
+        )
+        with self.database.connection() as connection:
+            rows = connection.execute(
+                "SELECT id, reason, status FROM storage_cleanup_queue WHERE storage_key = ?",
+                (staged_key,),
+            ).fetchall()
+            events = connection.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE event_type = 'document.storage_cleanup_pending'
+                     AND json_extract(metadata_json, '$.document_id') = ?""",
+                (document_id,),
+            ).fetchone()[0]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["reason"], "second reason")
+        self.assertEqual(rows[0]["status"], "pending")
+        self.assertEqual(first_id, second_id)
+        self.assertEqual(events, 2)
+
+
+    def test_cleanup_items_are_scoped_to_the_authorized_institution(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        other_institution_id = "institution-not-owned-by-admin"
+        with self.database.connection() as connection:
+            connection.execute(
+                """INSERT INTO institutions (id, name, status)
+                   VALUES (?, ?, 'active')""",
+                (other_institution_id, "Other institution"),
+            )
+            connection.execute(
+                """INSERT INTO users (id, username, password_hash, status)
+                   VALUES (?, ?, ?, 'active')""",
+                ("other-admin-user", "other-admin-user", "synthetic-password-hash"),
+            )
+            connection.execute(
+                """INSERT INTO institution_memberships
+                   (institution_id, user_id, role, status)
+                   VALUES (?, ?, 'administrator', 'active')""",
+                (other_institution_id, "other-admin-user"),
+            )
+
+        foreign_cleanup = self.database.enqueue_storage_cleanup(
+            "other-admin-user", other_institution_id, "foreign-document",
+            ".wuri-delete-" + "e" * 32, "cross-institution isolation",
+        )
+        self.assertFalse(
+            self.database.claim_storage_cleanup(user_id, foreign_cleanup)
+        )
+        visible = self.database.pending_storage_cleanups(user_id)
+        self.assertFalse(any(item["id"] == foreign_cleanup for item in visible))
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, foreign_cleanup)
+        with self.assertRaises(PermissionError):
+            self.database.record_storage_cleanup_failure(
+                user_id, foreign_cleanup, "unauthorized attempt",
+            )
+
+    def test_cleanup_enqueue_rejects_non_admin_in_same_institution(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        with self.database.connection() as connection:
+            membership = connection.execute(
+                """SELECT institution_id FROM institution_memberships
+                   WHERE user_id = (
+                     SELECT id FROM users WHERE username = 'research-admin'
+                   ) AND status = 'active' LIMIT 1"""
+            ).fetchone()
+            institution_id = membership["institution_id"]
+            connection.execute(
+                """UPDATE institution_memberships SET role = 'viewer'
+                   WHERE user_id = (
+                     SELECT id FROM users WHERE username = 'research-admin'
+                   ) AND institution_id = ?""",
+                (institution_id,),
+            )
+        user_id = self.database.user_by_username("research-admin")["id"]
+        with self.assertRaises(PermissionError):
+            self.database.enqueue_storage_cleanup(
+                user_id, institution_id, document_id,
+                ".wuri-delete-" + "f" * 32, "non-admin rejection",
+            )
+
+
+    def test_cleanup_claim_is_atomic_across_independent_database_instances(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "9" * 32, "synthetic concurrent claim",
+        )
+        from app.database import Database
+        second_database = Database(self.database.path)
+        barrier = threading.Barrier(2)
+        results = []
+        errors = []
+
+        def claim(database_instance):
+            try:
+                barrier.wait(timeout=5)
+                results.append(
+                    database_instance.claim_storage_cleanup(user_id, cleanup_id)
+                )
+            except Exception as error:
+                errors.append(error)
+
+        first = threading.Thread(target=claim, args=(self.database,))
+        second = threading.Thread(target=claim, args=(second_database,))
+        first.start()
+        second.start()
+        first.join(timeout=10)
+        second.join(timeout=10)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(sorted(results), [False, True])
+
+    def test_cleanup_enqueue_does_not_reveal_existing_id_without_membership(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        staged_key = ".wuri-delete-" + "8" * 32
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id, staged_key, "owned queue row",
+        )
+        outsider_id = self.database.ensure_admin(
+            "queue-probe-outsider", "synthetic outsider password long",
+        )
+        with self.assertRaises(PermissionError):
+            self.database.enqueue_storage_cleanup(
+                outsider_id, institution_id, document_id, staged_key,
+                "unauthorized idempotency probe",
+            )
+        self.assertTrue(cleanup_id)
+
+    def test_viewer_cannot_change_document_verification_metadata(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        owner_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(owner_id)[0]["id"]
+        viewer_id = self.database.ensure_admin(
+            "document-viewer", "synthetic viewer password long",
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """INSERT INTO institution_memberships
+                   (user_id, institution_id, role, status)
+                   VALUES (?, ?, 'viewer', 'active')""",
+                (viewer_id, institution_id),
+            )
+        self._act_as(viewer_id)
+        response = self.client.patch(
+            f"/api/documents/{document_id}",
+            json={"review_status": "verified"},
+        )
+        self.assertEqual(response.status_code, 403)
+        with self.database.connection() as connection:
+            record = connection.execute(
+                "SELECT review_status FROM documents WHERE id = ?",
+                (document_id,),
+            ).fetchone()
+        self.assertNotEqual(record["review_status"], "verified")
+
+    def test_cleanup_claim_and_completion_require_current_admin_membership(self):
+        self.login()
+        document_id, storage_key, assessment_id = self._create_document_for_delete()
+        user_id = self.database.user_by_username("research-admin")["id"]
+        institution_id = self.database.institutions_for_user(user_id)[0]["id"]
+        cleanup_id = self.database.enqueue_storage_cleanup(
+            user_id, institution_id, document_id,
+            ".wuri-delete-" + "b" * 32, "synthetic authorization test",
+        )
+        with self.database.connection() as connection:
+            connection.execute(
+                """UPDATE institution_memberships
+                   SET status = 'disabled'
+                   WHERE user_id = ? AND institution_id = ?""",
+                (user_id, institution_id),
+            )
+        self.assertFalse(self.database.claim_storage_cleanup(user_id, cleanup_id))
+        with self.assertRaises(PermissionError):
+            self.database.complete_storage_cleanup(user_id, cleanup_id)
+        with self.assertRaises(PermissionError):
+            self.database.record_storage_cleanup_failure(
+                user_id, cleanup_id, "synthetic failure"
+            )
+
 
     def _create_document_for_delete(self):
         user_id = self.database.user_by_username("research-admin")["id"]

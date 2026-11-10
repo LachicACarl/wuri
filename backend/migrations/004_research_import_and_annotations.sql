@@ -1,5 +1,3 @@
-PRAGMA foreign_keys = OFF;
-BEGIN IMMEDIATE;
 
 DROP TABLE IF EXISTS research_examples_v2;
 
@@ -38,9 +36,6 @@ ALTER TABLE research_examples_v2 RENAME TO research_examples;
 CREATE INDEX IF NOT EXISTS ix_research_examples_partition
     ON research_examples(dataset_id, partition_name, framework);
 
-COMMIT;
-PRAGMA foreign_key_check;
-PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS research_dataset_imports (
     id TEXT PRIMARY KEY,
