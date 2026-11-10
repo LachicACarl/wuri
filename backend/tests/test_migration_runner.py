@@ -21,7 +21,7 @@ class MigrationRunnerTests(unittest.TestCase):
 
         migration_root = Path(__file__).resolve().parents[1] / "migrations"
         migrations = sorted(migration_root.glob("[0-9][0-9][0-9]_*.sql"))
-        self.assertEqual(len(migrations), 11)
+        self.assertEqual(len(migrations), 12
 
         connection = sqlite3.connect(":memory:")
         connection.row_factory = sqlite3.Row
@@ -311,3 +311,24 @@ class MigrationRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_migration_012_adds_nullable_cleanup_claim_token(self):
+        import tempfile
+        from pathlib import Path
+        from app.database import Database
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Database(Path(directory) / "migration-012.sqlite3")
+            with database.connection() as connection:
+                columns = {
+                    row["name"]: row for row in connection.execute(
+                        "PRAGMA table_info(storage_cleanup_queue)"
+                    )
+                }
+                self.assertIn("claim_token", columns)
+                self.assertEqual(columns["claim_token"]["notnull"], 0)
+                self.assertIsNotNone(connection.execute(
+                    "SELECT 1 FROM schema_migrations WHERE migration_name = ?",
+                    ("012_storage_cleanup_claim_token.sql",),
+                ).fetchone())
+                self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
